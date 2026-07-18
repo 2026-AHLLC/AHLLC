@@ -117,3 +117,67 @@ const ToastAction = React.forwardRef<
 
 ToastAction.displayName =
   ToastPrimitives.Action.displayName;
+
+const ToastClose = React.forwardRef<
+  React.ElementRef<typeof ToastPrimitives.Close>,
+  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Close>
+>(({ className, ...props }, ref) => (
+  <ToastPrimitives.Close
+    ref={ref}
+    toast-close=""
+    className={cn(
+      [
+        "absolute right-3 top-3 rounded-md p-1",
+        "text-zinc-400 transition-colors",
+        "hover:text-white",
+        "focus:outline-none",
+        "focus:ring-2",
+        "focus:ring-blue-500",
+        "disabled:pointer-events-none",
+        "opacity-0",
+        "group-hover:opacity-100",
+        "group-focus-within:opacity-100",
+        "group-data-[state=open]:opacity-100",
+      ].join(" "),
+      className
+    )}
+    {...props}
+  >
+    ✕
+  </ToastPrimitives.Close>
+));
+
+ToastClose.displayName = ToastPrimitives.Close.displayName;
+
+const ToastTitle = React.forwardRef<
+  React.ElementRef<typeof ToastPrimitives.Title>,
+  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Title>
+>(({ className, ...props }, ref) => (
+  <ToastPrimitives.Title
+    ref={ref}
+    className={cn(
+      "text-sm font-semibold leading-none tracking-tight",
+      className
+    )}
+    {...props}
+  />
+));
+
+ToastTitle.displayName = ToastPrimitives.Title.displayName;
+
+const ToastDescription = React.forwardRef<
+  React.ElementRef<typeof ToastPrimitives.Description>,
+  React.ComponentPropsWithoutRef<typeof ToastPrimitives.Description>
+>(({ className, ...props }, ref) => (
+  <ToastPrimitives.Description
+    ref={ref}
+    className={cn(
+      "mt-1 text-sm leading-relaxed opacity-90",
+      className
+    )}
+    {...props}
+  />
+));
+
+ToastDescription.displayName =
+  ToastPrimitives.Description.displayName;
