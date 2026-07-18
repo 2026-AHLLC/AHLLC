@@ -210,3 +210,16 @@ const ListItem = React.forwardRef<
 
 ListItem.displayName = "ListItem";
   NavigationMenuPrimitive.Viewport.displayName;
+
+export {
+  NavigationMenu,
+  NavigationMenuList,
+  NavigationMenuItem,
+  NavigationMenuTrigger,
+  NavigationMenuContent,
+  NavigationMenuLink,
+  NavigationMenuIndicator,
+  NavigationMenuViewport,
+  navigationMenuTriggerStyle,
+  ListItem,
+};
