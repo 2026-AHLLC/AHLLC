@@ -150,4 +150,20 @@ const NavigationMenuViewport = React.forwardRef<
 ));
 
 NavigationMenuViewport.displayName =
+  return (
+  <NavigationMenuPrimitive.Root
+    ref={ref}
+    className={cn(
+      "relative z-20 flex max-w-max flex-1 items-center justify-center",
+      className
+    )}
+    {...props}
+  >
+    {children}
+
+    <NavigationMenuIndicator />
+
+    <NavigationMenuViewport />
+  </NavigationMenuPrimitive.Root>
+);
   NavigationMenuPrimitive.Viewport.displayName;
