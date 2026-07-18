@@ -179,6 +179,7 @@ export default function RootLayout({
         {children}
 
         <Analytics />
+        import { Toaster } from "@/components/ui/toaster";
 
         <SpeedInsights />
       </body>
