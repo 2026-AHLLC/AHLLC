@@ -166,4 +166,47 @@ NavigationMenuViewport.displayName =
     <NavigationMenuViewport />
   </NavigationMenuPrimitive.Root>
 );
+
+const ListItem = React.forwardRef<
+  React.ElementRef<"a">,
+  React.ComponentPropsWithoutRef<"a">
+>(({ className, title, children, ...props }, ref) => {
+  return (
+    <li>
+      <NavigationMenuLink asChild>
+        <a
+          ref={ref}
+          className={cn(
+            [
+              "block select-none rounded-xl p-4",
+              "transition-all duration-200",
+              "outline-none",
+              "hover:bg-zinc-900",
+              "focus:bg-zinc-900",
+              "hover:text-white",
+              "focus:text-white",
+              "border border-transparent",
+              "hover:border-white/10",
+              "focus:border-white/10",
+            ].join(" "),
+            className
+          )}
+          {...props}
+        >
+          <div className="mb-1 text-sm font-semibold leading-none text-white">
+            {title}
+          </div>
+
+          {children ? (
+            <p className="line-clamp-2 text-sm leading-6 text-zinc-400">
+              {children}
+            </p>
+          ) : null}
+        </a>
+      </NavigationMenuLink>
+    </li>
+  );
+});
+
+ListItem.displayName = "ListItem";
   NavigationMenuPrimitive.Viewport.displayName;
