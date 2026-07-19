@@ -39,7 +39,7 @@ const projects: Project[] = [
     category: "Spiritual",
     description:
       "Custom branding, website development for an esoteric business.",
-    image: "/images/portfolio/djinnmagic.jpg",
+    image: "/images/portfolio/ritualmagick-app.jpg",
     slug: "ritualmagick-app",
   },
   {
