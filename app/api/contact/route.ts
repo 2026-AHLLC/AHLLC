@@ -36,19 +36,18 @@ export async function POST(request: Request) {
       "johnegan2025@gmail.com";
 
     if (!apiKey || !fromEmail) {
-      console.error(
-        "Missing RESEND_API_KEY or RESEND_FROM_EMAIL."
-      );
+  return NextResponse.json(
+    {
+      success: false,
+      message: `Missing: apiKey=${!!apiKey}, fromEmail=${!!fromEmail}`,
+    },
+    { status: 500 }
+  );
+}
 
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "The contact form is temporarily unavailable.",
-        },
-        { status: 500 }
-      );
-    }
+
+
+
 
     const formData = await request.formData();
 
