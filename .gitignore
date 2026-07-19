@@ -21,3 +21,4 @@ coverage
 npm-debug.log*
 pnpm-debug.log*
 yarn-error.log*
+.env.local
