@@ -1,9 +1,8 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -22,42 +21,51 @@ AH LLC provides:
 - Custom software
 - AI-powered business solutions
 
-Your primary goals are:
-1. Answer questions about AH LLC and its services.
-2. Help visitors determine which service fits their needs.
-3. Encourage qualified prospects to request a free audit or contact AH LLC.
-4. Collect useful project details conversationally.
+Your goals:
+1. Answer questions about AH LLC services.
+2. Help visitors identify the right service.
+3. Encourage qualified visitors to request a free audit or contact AH LLC.
+4. Gather useful project details conversationally.
 5. Never invent pricing, guarantees, clients, results, or capabilities.
 
 Communication style:
-- Clear, professional, confident, and helpful.
+- Professional, clear, confident, and helpful.
 - Keep most answers under 150 words.
 - Ask only one follow-up question at a time.
-- Do not use aggressive sales tactics.
 - Do not claim to be human.
-- Do not provide legal, medical, or financial advice.
-- When appropriate, direct users to /contact or /free-audit.
+- Do not use aggressive sales tactics.
+- Direct visitors to /contact or /free-audit when appropriate.
 
 When qualifying a lead, try to learn:
 - Their business or organization
-- Their current website or digital presence
+- Their website or current digital presence
 - Their primary problem
-- Their desired outcome
-- Their approximate timeline
-- Their preferred way to be contacted
-
-AH LLC website:
-https://ahllc.biz
+- Their desired result
+- Their timeline
+- Their preferred contact method
 `;
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      console.error("OPENAI_API_KEY is missing.");
+
       return NextResponse.json(
-        { error: "The chatbot is not configured." },
-        { status: 500 },
+        {
+          error:
+            "The AI assistant is not configured. Please contact AH LLC directly.",
+        },
+        { status: 503 },
       );
     }
+
+    // Create the client only when the route receives a request.
+    // This prevents the Vercel build from failing during page-data collection.
+    const openai = new OpenAI({
+      apiKey,
+    });
 
     const body = (await request.json()) as {
       messages?: ChatMessage[];
@@ -69,8 +77,13 @@ export async function POST(request: Request) {
             (message): message is ChatMessage =>
               (message.role === "user" ||
                 message.role === "assistant") &&
-              typeof message.content === "string",
+              typeof message.content === "string" &&
+              message.content.trim().length > 0,
           )
+          .map((message) => ({
+            role: message.role,
+            content: message.content.trim(),
+          }))
           .slice(-12)
       : [];
 
@@ -101,11 +114,11 @@ export async function POST(request: Request) {
       store: false,
     });
 
-    return NextResponse.json({
-      message:
-        response.output_text ||
-        "I’m sorry, but I couldn’t generate a response. Please try again.",
-    });
+    const message =
+      response.output_text?.trim() ||
+      "I’m sorry, but I couldn’t generate a response. Please try again.";
+
+    return NextResponse.json({ message });
   } catch (error) {
     console.error("AH LLC chatbot error:", error);
 
