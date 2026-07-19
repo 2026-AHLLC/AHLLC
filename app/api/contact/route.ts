@@ -193,18 +193,17 @@ export async function POST(request: Request) {
       `,
     });
 
-    if (error) {
-      console.error("Resend error:", error);
+   if (error) {
+  console.error("Resend error:", error);
 
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Your message could not be sent. Please try again.",
-        },
-        { status: 502 }
-      );
-    }
+  return NextResponse.json(
+    {
+      success: false,
+      message: JSON.stringify(error),
+    },
+    { status: 502 }
+  );
+}
 
     return NextResponse.json({
       success: true,
