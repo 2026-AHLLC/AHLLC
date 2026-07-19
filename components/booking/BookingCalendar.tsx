@@ -6,7 +6,7 @@ export default function BookingCalendar() {
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950">
       <Cal
-        calLink="YOUR-CAL-USERNAME/free-consultation"
+        calLink="https://cal.com/john-egan-2025"
         style={{
           width: "100%",
           height: "100%",
