@@ -59,10 +59,10 @@ export default function ContactPage() {
                 <Mail className="mb-4 h-8 w-8 text-blue-400" />
                 <h3 className="text-xl font-bold text-white">Email</h3>
                 <a
-                  href="mailto:email@alibabas.com"
+                  href="mailto:johnegan2025@gmail.com"
                   className="mt-3 inline-block text-zinc-400 transition hover:text-blue-400"
                 >
-                  john@egan.work
+                  JohnEgan2025@gmail.com
                 </a>
               </Card>
 
@@ -109,7 +109,7 @@ export default function ContactPage() {
             </p>
 
             <Button size="lg" className="mt-10" asChild>
-              <a href="mailto:email@alibabas.com">
+              <a href="mailto:johnegan2025@gmail.com">
                 Schedule a Free Consultation
               </a>
             </Button>
