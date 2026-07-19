@@ -1,18 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X, Sparkles } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-const navigation = [
+type NavItem = {
+  name: string;
+  href: Route;
+};
+
+const navigation: NavItem[] = [
   { name: "Home", href: "/" },
-  { name: "AI Solutions", href: "/ai" },
   { name: "Services", href: "/services" },
   { name: "Portfolio", href: "/portfolio" },
   { name: "Pricing", href: "/pricing" },
-  { name: "Resources", href: "/blog" },
   { name: "Contact", href: "/contact" },
 ];
 
@@ -46,7 +50,7 @@ export default function Navbar() {
         transition={{ duration: 0.5 }}
         className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
           scrolled
-            ? "backdrop-blur-xl bg-zinc-950/75 border-b border-white/10 shadow-xl"
+            ? "border-b border-white/10 bg-zinc-950/75 backdrop-blur-xl shadow-xl"
             : "bg-transparent"
         }`}
       >
@@ -55,15 +59,13 @@ export default function Navbar() {
             scrolled ? "h-16" : "h-20"
           }`}
         >
-          {/* Logo */}
-
           <Link href="/" className="group flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 via-violet-600 to-cyan-500 shadow-lg">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
 
             <div>
-              <div className="font-bold tracking-tight text-white text-xl">
+              <div className="text-xl font-bold tracking-tight text-white">
                 AH LLC
               </div>
 
@@ -106,14 +108,14 @@ export default function Navbar() {
 
           <div className="hidden lg:block">
             <Link
-              href="/contact"
+              href="/free-audit"
               className="rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:scale-105 hover:shadow-2xl"
             >
               Get Free Growth Plan
             </Link>
           </div>
 
-          {/* Mobile */}
+          {/* Mobile Menu Button */}
 
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -159,7 +161,7 @@ export default function Navbar() {
 
               <div className="mt-10">
                 <Link
-                  href="/contact"
+                  href="/free-audit"
                   className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-4 text-lg font-semibold text-white"
                 >
                   Get Free Growth Plan
