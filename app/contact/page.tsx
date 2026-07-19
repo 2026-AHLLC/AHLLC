@@ -62,7 +62,7 @@ export default function ContactPage() {
                   href="mailto:email@alibabas.com"
                   className="mt-3 inline-block text-zinc-400 transition hover:text-blue-400"
                 >
-                  email@alibabas.com
+                  john@egan.work
                 </a>
               </Card>
 
