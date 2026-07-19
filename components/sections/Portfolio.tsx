@@ -35,12 +35,12 @@ const projects: Project[] = [
     slug: "bewise-contractors",
   },
   {
-    title: "DJINNMagic",
+    title: "Ritual Magick App",
     category: "Spiritual",
     description:
-      "Custom branding, SEO, and website development for an esoteric business.",
+      "Custom branding, website development for an esoteric business.",
     image: "/images/portfolio/djinnmagic.jpg",
-    slug: "djinnmagic",
+    slug: "ritualmagick-app",
   },
   {
     title: "Suffolk NY Pool Services",
@@ -58,14 +58,7 @@ const projects: Project[] = [
     image: "/images/portfolio/johnnys-studio.jpg",
     slug: "johnnys-studio",
   },
-  {
-    title: "AI Business Dashboard",
-    category: "Software",
-    description:
-      "Custom AI-powered business dashboard for workflow automation.",
-    image: "/images/portfolio/dashboard.jpg",
-    slug: "ai-dashboard",
-  },
+  
 ];
 
 export default function Portfolio() {
