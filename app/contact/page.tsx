@@ -109,7 +109,7 @@ export default function ContactPage() {
             </p>
 
             <Button size="lg" className="mt-10" asChild>
-              <a href="mailto:johnegan2025@gmail.com">
+              <a href="/book">
                 Schedule a Free Consultation
               </a>
             </Button>
