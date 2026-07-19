@@ -26,8 +26,8 @@ const projects = [
       "Lead-generation website for a home improvement contractor.",
   },
   {
-    slug: "djinnmagic",
-    title: "DJINNMagic",
+    slug: "ritualmagick-app",
+    title: "Ritual Magick App",
     category: "Publishing",
     description:
       "Custom branded website with immersive design and digital content.",
