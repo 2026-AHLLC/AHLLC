@@ -23,7 +23,7 @@ const projects: Project[] = [
     category: "AI Consulting",
     description:
       "Modern AI consulting and software agency built with Next.js 15.",
-    image: "/images/portfolio/ahllc.jpg",
+    image: "/images/portfolio/ahllc.png",
     slug: "ahllc",
   },
   {
@@ -31,7 +31,7 @@ const projects: Project[] = [
     category: "Construction",
     description:
       "Lead-generation website for a masonry and home improvement company.",
-    image: "/images/portfolio/bewise-contractors.jpg",
+    image: "/images/portfolio/bewise-contractors.png",
     slug: "bewise-contractors",
   },
   {
@@ -39,7 +39,7 @@ const projects: Project[] = [
     category: "Spiritual",
     description:
       "Custom branding, website development for an esoteric business.",
-    image: "/images/portfolio/ritualmagick-app.jpg",
+    image: "/images/portfolio/ritualmagick-app.png",
     slug: "ritualmagick-app",
   },
   {
@@ -47,7 +47,7 @@ const projects: Project[] = [
     category: "Local Business",
     description:
       "Local SEO and lead generation website for a swimming pool company.",
-    image: "/images/portfolio/pools.jpg",
+    image: "/images/portfolio/pools.png",
     slug: "suffolk-ny-pool-services",
   },
   {
@@ -55,7 +55,7 @@ const projects: Project[] = [
     category: "Creative",
     description:
       "Photography, videography, and digital marketing portfolio.",
-    image: "/images/portfolio/johnnys-studio.jpg",
+    image: "/images/portfolio/johnnys-studio.png",
     slug: "johnnys-studio",
   },
   
