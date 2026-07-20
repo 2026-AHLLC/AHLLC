@@ -1,12 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AHChatbot } from "@/components/chat/AHChatbot";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Toaster } from "@/components/ui/toaster";
-import { Analytics } from "@vercel/analytics/next"
 
+import { AHChatbot } from "@/components/chat/AHChatbot";
+import { Toaster } from "@/components/ui/toaster";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -57,6 +56,41 @@ export const metadata: Metadata = {
     google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
   },
 
+  manifest: "/manifest.webmanifest",
+
+  icons: {
+    icon: [
+      {
+        url: "/favicon.ico",
+        sizes: "any",
+      },
+      {
+        url: "/favicon.svg",
+        type: "image/svg+xml",
+      },
+      {
+        url: "/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        url: "/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+
+    shortcut: "/favicon.ico",
+
+    apple: [
+      {
+        url: "/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
+
   robots: {
     index: true,
     follow: true,
@@ -89,16 +123,10 @@ export const metadata: Metadata = {
 
   twitter: {
     card: "summary_large_image",
-    title: "AH LLC",
+    title: "AH LLC | AI • Automation • Growth",
     description:
       "AI-powered websites, automation, and business growth.",
     images: ["/og-image.jpg"],
-  },
-
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
   },
 
   alternates: {
