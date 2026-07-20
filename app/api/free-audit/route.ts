@@ -86,27 +86,6 @@ function normalizeStringArray(
     .slice(0, maximum);
 }
 
-function parseJson(text: string): unknown {
-  const trimmed = text.trim();
-
-  try {
-    return JSON.parse(trimmed) as unknown;
-  } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-
-    if (start < 0 || end <= start) {
-      throw new Error(
-        "The AI response did not contain valid JSON.",
-      );
-    }
-
-    return JSON.parse(
-      trimmed.slice(start, end + 1),
-    ) as unknown;
-  }
-}
-
 function normalizeReport(value: unknown): AuditReport {
   const source =
     value && typeof value === "object"
@@ -810,13 +789,12 @@ export async function POST(request: Request) {
       apiKey: openAiApiKey,
     });
 
-    const response =
-      await openai.responses.create({
-        model:
-          process.env.OPENAI_AUDIT_MODEL ??
-          "gpt-5-mini",
+    const response = await openai.responses.create({
+      model:
+        process.env.OPENAI_AUDIT_MODEL ??
+        "gpt-5-mini",
 
-        instructions: `
+      instructions: `
 You are a senior business-growth, website-conversion, SEO, AI, and automation consultant for AH LLC.
 
 Create a useful preliminary audit from the visitor's submitted business information and any publicly accessible homepage text.
@@ -828,38 +806,9 @@ Rules:
 - Keep recommendations practical, specific, and concise.
 - The overall score is a preliminary growth-readiness and opportunity score, not a certified technical score.
 - Use plain business language.
-- Output only valid JSON.
-- Do not use Markdown.
-- Do not include a code fence.
+      `.trim(),
 
-Return this exact JSON shape:
-
-{
-  "overallScore": 0,
-  "summary": "",
-  "strengths": [""],
-  "opportunities": [
-    {
-      "title": "",
-      "impact": "High",
-      "finding": "",
-      "recommendation": ""
-    }
-  ],
-  "quickWins": [""],
-  "aiAutomationIdeas": [""],
-  "nextStep": "",
-  "disclaimer": ""
-}
-
-Requirements:
-- Return 3 to 5 opportunities.
-- Return 3 to 5 quick wins.
-- Return 2 to 5 AI or automation ideas.
-- Every opportunity impact must be exactly "High", "Medium", or "Low".
-        `.trim(),
-
-        input: `
+      input: `
 BUSINESS SUBMISSION
 
 Name:
@@ -881,11 +830,7 @@ Desired result:
 ${goal}
 
 Budget:
-${
-  budget
-    ? displayValue(budget)
-    : "Not provided"
-}
+${budget ? displayValue(budget) : "Not provided"}
 
 Timeline:
 ${displayValue(timeline)}
@@ -896,11 +841,107 @@ ${
   homepageText ||
   "Homepage content was unavailable. Base the audit only on the visitor submission and explicitly acknowledge that limitation."
 }
-        `.trim(),
+      `.trim(),
 
-        max_output_tokens: 1_500,
-        store: false,
-      });
+      text: {
+        format: {
+          type: "json_schema",
+          name: "audit_report",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              overallScore: {
+                type: "integer",
+                minimum: 0,
+                maximum: 100,
+              },
+              summary: {
+                type: "string",
+              },
+              strengths: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+                minItems: 1,
+                maxItems: 4,
+              },
+              opportunities: {
+                type: "array",
+                minItems: 3,
+                maxItems: 5,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    title: {
+                      type: "string",
+                    },
+                    impact: {
+                      type: "string",
+                      enum: [
+                        "High",
+                        "Medium",
+                        "Low",
+                      ],
+                    },
+                    finding: {
+                      type: "string",
+                    },
+                    recommendation: {
+                      type: "string",
+                    },
+                  },
+                  required: [
+                    "title",
+                    "impact",
+                    "finding",
+                    "recommendation",
+                  ],
+                },
+              },
+              quickWins: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+                minItems: 3,
+                maxItems: 5,
+              },
+              aiAutomationIdeas: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+                minItems: 2,
+                maxItems: 5,
+              },
+              nextStep: {
+                type: "string",
+              },
+              disclaimer: {
+                type: "string",
+              },
+            },
+            required: [
+              "overallScore",
+              "summary",
+              "strengths",
+              "opportunities",
+              "quickWins",
+              "aiAutomationIdeas",
+              "nextStep",
+              "disclaimer",
+            ],
+          },
+        },
+      },
+
+      max_output_tokens: 1_500,
+      store: false,
+    });
 
     if (!response.output_text) {
       throw new Error(
@@ -909,7 +950,7 @@ ${
     }
 
     const report = normalizeReport(
-      parseJson(response.output_text),
+      JSON.parse(response.output_text) as unknown,
     );
 
     const resendApiKey =
@@ -994,21 +1035,24 @@ ${
       success: true,
       report,
     });
-  }catch (error) {
-  console.error("POST /api/free-audit failed:", error);
+  } catch (error) {
+    console.error(
+      "POST /api/free-audit failed:",
+      error,
+    );
 
-  const message =
-    error instanceof Error
-      ? error.message
-      : String(error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : "The instant audit could not be generated.";
 
-  return NextResponse.json(
-    {
-      error: message,
-    },
-    {
-      status: 500,
-    },
-  );
-}
+    return NextResponse.json(
+      {
+        error: message,
+      },
+      {
+        status: 500,
+      },
+    );
+  }
 }
