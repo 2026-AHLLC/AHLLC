@@ -1,126 +1,85 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  CheckCircle2,
-  Calendar,
-  Mail,
   ArrowRight,
+  CheckCircle2,
+  Clock3,
+  Mail,
 } from "lucide-react";
 
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
-import Section from "@/components/layout/Section";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-
-export const metadata = {
-  title: "Audit Submitted | AH LLC",
+export const metadata: Metadata = {
+  title: "Audit Request Received",
   description:
-    "Your free AI Business Growth Audit has been received. We'll review your business and contact you with personalized recommendations.",
+    "Your AH LLC free business audit request has been received.",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
-export default function AuditSuccessPage() {
+export default function FreeAuditSuccessPage() {
   return (
-    <>
-      <Navbar />
+    <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 py-20 text-white">
+      <section className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/80 p-8 text-center shadow-2xl sm:p-12">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400" />
 
-      <main className="pt-20">
-        <Section spacing="xl" background="gradient">
-          <div className="mx-auto max-w-4xl text-center">
-            <CheckCircle2 className="mx-auto mb-6 h-20 w-20 text-green-500" />
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400/10">
+          <CheckCircle2 className="h-9 w-9 text-emerald-400" />
+        </div>
 
-            <Badge variant="gradient" className="mb-6">
-              Audit Submitted
-            </Badge>
+        <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-cyan-400">
+          Request received
+        </p>
 
-            <h1 className="text-5xl font-black text-white md:text-6xl">
-              Thank You!
-            </h1>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+          Your free audit is now in the review queue.
+        </h1>
 
-            <p className="mx-auto mt-8 max-w-3xl text-xl leading-8 text-zinc-300">
-              We've received your Business Growth Audit request.
-              Our team will review your information and prepare
-              personalized recommendations designed to help your
-              business grow.
-            </p>
-          </div>
-        </Section>
+        <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-zinc-300">
+          AH LLC will review your submission and identify the
+          strongest opportunities for improving your website,
+          marketing, automation, and growth systems.
+        </p>
 
-        <Section spacing="xl">
-          <div className="mx-auto max-w-5xl grid gap-8 md:grid-cols-3">
-            <Card variant="feature" className="rounded-3xl p-8 text-center">
-              <Mail className="mx-auto mb-5 h-10 w-10 text-blue-400" />
-
-              <h3 className="text-2xl font-bold text-white">
-                1. We Review
-              </h3>
-
-              <p className="mt-4 text-zinc-400 leading-7">
-                We'll analyze your website, marketing, SEO,
-                automation opportunities, and overall digital
-                presence.
-              </p>
-            </Card>
-
-            <Card variant="feature" className="rounded-3xl p-8 text-center">
-              <CheckCircle2 className="mx-auto mb-5 h-10 w-10 text-green-400" />
-
-              <h3 className="text-2xl font-bold text-white">
-                2. We Prepare
-              </h3>
-
-              <p className="mt-4 text-zinc-400 leading-7">
-                You'll receive practical recommendations and a
-                prioritized action plan tailored to your business.
-              </p>
-            </Card>
-
-            <Card variant="feature" className="rounded-3xl p-8 text-center">
-              <Calendar className="mx-auto mb-5 h-10 w-10 text-purple-400" />
-
-              <h3 className="text-2xl font-bold text-white">
-                3. We Meet
-              </h3>
-
-              <p className="mt-4 text-zinc-400 leading-7">
-                If you'd like, we'll walk through the audit together
-                and discuss solutions that fit your goals and budget.
-              </p>
-            </Card>
-          </div>
-        </Section>
-
-        <Section background="muted" spacing="xl">
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-4xl font-bold text-white">
-              Want to Skip the Wait?
+        <div className="mt-8 grid gap-4 text-left sm:grid-cols-2">
+          <article className="rounded-2xl border border-white/10 bg-black/20 p-5">
+            <Clock3 className="h-5 w-5 text-cyan-400" />
+            <h2 className="mt-4 font-semibold">
+              What happens next
             </h2>
-
-            <p className="mt-6 text-lg leading-8 text-zinc-400">
-              Schedule a free strategy session now, and we'll review
-              your business together while your audit is being
-              prepared.
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              We will review your request and contact you with the
+              recommended next step.
             </p>
+          </article>
 
-            <div className="mt-10 flex flex-wrap justify-center gap-4">
-              <Button asChild size="lg">
-                <Link href="/contact">
-                  Schedule a Free Consultation
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
+          <article className="rounded-2xl border border-white/10 bg-black/20 p-5">
+            <Mail className="h-5 w-5 text-cyan-400" />
+            <h2 className="mt-4 font-semibold">Watch your inbox</h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">
+              Most qualified audit requests receive a response within
+              one business day.
+            </p>
+          </article>
+        </div>
 
-              <Button asChild variant="outline" size="lg">
-                <Link href="/portfolio">
-                  View Our Portfolio
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </Section>
-      </main>
+        <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-xl border border-white/10 px-6 py-3 font-semibold text-white transition hover:bg-white/5"
+          >
+            Return home
+          </Link>
 
-      <Footer />
-    </>
+          <Link
+            href="/portfolio"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-400 px-6 py-3 font-semibold text-zinc-950 transition hover:bg-cyan-300"
+          >
+            View our work
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 }
