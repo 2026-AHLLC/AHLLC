@@ -1,8 +1,10 @@
+import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type AuditPayload = {
   name?: unknown;
@@ -19,82 +21,215 @@ type AuditPayload = {
   companyWebsite?: unknown;
 };
 
-const MAX_MESSAGE_LENGTH = 4_000;
+type AuditReport = {
+  overallScore: number;
+  summary: string;
+  strengths: string[];
+  opportunities: Array<{
+    title: string;
+    impact: "High" | "Medium" | "Low";
+    finding: string;
+    recommendation: string;
+  }>;
+  quickWins: string[];
+  aiAutomationIdeas: string[];
+  nextStep: string;
+  disclaimer: string;
+};
 
-function cleanString(value: unknown, maxLength = MAX_MESSAGE_LENGTH) {
-  return typeof value === "string"
-    ? value.trim().slice(0, maxLength)
-    : "";
-}
+const clean = (value: unknown, max = 4000) =>
+  typeof value === "string" ? value.trim().slice(0, max) : "";
 
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
+const validEmail = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
-function escapeHtml(value: string) {
-  return value
+const escapeHtml = (value: string) =>
+  value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+
+const display = (value: string) =>
+  value.replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+function parseJson(text: string) {
+  try {
+    return JSON.parse(text.trim()) as unknown;
+  } catch {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start < 0 || end <= start) {
+      throw new Error("AI response did not contain valid JSON.");
+    }
+    return JSON.parse(text.slice(start, end + 1)) as unknown;
+  }
 }
 
-function displayValue(value: string) {
-  return value
-    .replaceAll("-", " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
+function normalizeReport(value: unknown): AuditReport {
+  const source =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+
+  const strings = (input: unknown, max = 5) =>
+    Array.isArray(input)
+      ? input
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .slice(0, max)
+      : [];
+
+  const score = Number(source.overallScore);
+
+  return {
+    overallScore: Number.isFinite(score)
+      ? Math.max(0, Math.min(100, Math.round(score)))
+      : 50,
+    summary:
+      typeof source.summary === "string"
+        ? source.summary.trim()
+        : "This preliminary audit identifies practical growth opportunities.",
+    strengths: strings(source.strengths, 4),
+    opportunities: Array.isArray(source.opportunities)
+      ? source.opportunities
+          .filter(
+            (item): item is Record<string, unknown> =>
+              Boolean(item) && typeof item === "object",
+          )
+          .map((item) => ({
+            title:
+              typeof item.title === "string"
+                ? item.title.trim()
+                : "Growth opportunity",
+            impact:
+              item.impact === "High" || item.impact === "Low"
+                ? item.impact
+                : "Medium",
+            finding:
+              typeof item.finding === "string"
+                ? item.finding.trim()
+                : "",
+            recommendation:
+              typeof item.recommendation === "string"
+                ? item.recommendation.trim()
+                : "",
+          }))
+          .filter(
+            (item) =>
+              item.title && item.finding && item.recommendation,
+          )
+          .slice(0, 5)
+      : [],
+    quickWins: strings(source.quickWins, 5),
+    aiAutomationIdeas: strings(source.aiAutomationIdeas, 5),
+    nextStep:
+      typeof source.nextStep === "string"
+        ? source.nextStep.trim()
+        : "Schedule a strategy call with AH LLC to validate priorities and plan implementation.",
+    disclaimer:
+      typeof source.disclaimer === "string"
+        ? source.disclaimer.trim()
+        : "This is a preliminary AI-generated audit based on submitted information and should be validated through a complete technical review.",
+  };
+}
+
+async function getHomepageText(website: string) {
+  if (!website) return "";
+
+  try {
+    const url = new URL(website);
+
+    if (!["http:", "https:"].includes(url.protocol)) return "";
+
+    const hostname = url.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".local") ||
+      hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0"
+    ) {
+      return "";
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(url, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "AHLLC-AuditBot/1.0 (+https://ahllc.biz)",
+        Accept: "text/html",
+      },
+      cache: "no-store",
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) return "";
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("text/html")) return "";
+
+    const html = (await response.text()).slice(0, 250000);
+
+    return html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 12000);
+  } catch {
+    return "";
+  }
 }
 
 export async function GET() {
   return NextResponse.json({
     status: "ok",
     route: "/api/free-audit",
-    configured: Boolean(
-      process.env.RESEND_API_KEY &&
-        process.env.RESEND_FROM_EMAIL &&
-        process.env.CONTACT_TO_EMAIL,
-    ),
+    configured: {
+      openai: Boolean(process.env.OPENAI_API_KEY),
+      email: Boolean(
+        process.env.RESEND_API_KEY &&
+          process.env.RESEND_FROM_EMAIL &&
+          process.env.CONTACT_TO_EMAIL,
+      ),
+    },
   });
 }
 
 export async function POST(request: Request) {
   try {
-    const resendApiKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.RESEND_FROM_EMAIL;
-    const contactEmail = process.env.CONTACT_TO_EMAIL;
-
-    if (!resendApiKey || !fromEmail || !contactEmail) {
-      console.error(
-        "Free audit email environment variables are missing.",
-      );
-
+    if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        {
-          error:
-            "The audit service is temporarily unavailable. Please contact AH LLC directly.",
-        },
+        { error: "The instant audit service is temporarily unavailable." },
         { status: 503 },
       );
     }
 
     const body = (await request.json()) as AuditPayload;
 
-    // Honeypot field: silently accept likely bot submissions.
-    if (cleanString(body.companyWebsite, 200)) {
+    if (clean(body.companyWebsite, 200)) {
       return NextResponse.json({ success: true });
     }
 
-    const name = cleanString(body.name, 120);
-    const email = cleanString(body.email, 254).toLowerCase();
-    const phone = cleanString(body.phone, 50);
-    const company = cleanString(body.company, 160);
-    const website = cleanString(body.website, 500);
-    const auditFocus = cleanString(body.auditFocus, 100);
-    const challenge = cleanString(body.challenge);
-    const goal = cleanString(body.goal);
-    const budget = cleanString(body.budget, 100);
-    const timeline = cleanString(body.timeline, 100);
+    const name = clean(body.name, 120);
+    const email = clean(body.email, 254).toLowerCase();
+    const phone = clean(body.phone, 50);
+    const company = clean(body.company, 160);
+    const website = clean(body.website, 500);
+    const auditFocus = clean(body.auditFocus, 100);
+    const challenge = clean(body.challenge);
+    const goal = clean(body.goal);
+    const budget = clean(body.budget, 100);
+    const timeline = clean(body.timeline, 100);
     const consent = body.consent === true;
 
     if (
@@ -112,7 +247,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!isValidEmail(email)) {
+    if (!validEmail(email)) {
       return NextResponse.json(
         { error: "Please enter a valid email address." },
         { status: 400 },
@@ -121,159 +256,117 @@ export async function POST(request: Request) {
 
     if (!consent) {
       return NextResponse.json(
-        {
-          error:
-            "Please confirm that AH LLC may contact you about your audit.",
-        },
+        { error: "Please confirm that AH LLC may contact you." },
         { status: 400 },
       );
     }
 
-    if (website) {
-      try {
-        const parsed = new URL(website);
+    const homepageText = await getHomepageText(website);
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-        if (!["http:", "https:"].includes(parsed.protocol)) {
-          throw new Error("Unsupported website protocol.");
-        }
-      } catch {
-        return NextResponse.json(
-          { error: "Please enter a valid website address." },
-          { status: 400 },
-        );
+    const response = await openai.responses.create({
+      model: process.env.OPENAI_AUDIT_MODEL ?? "gpt-5-mini",
+      instructions: `
+You are a senior business-growth, website-conversion, SEO, AI, and automation consultant for AH LLC.
+
+Create a preliminary audit from the visitor submission and any public homepage text.
+
+Rules:
+- Never invent analytics, rankings, speed scores, revenue, conversion rates, guarantees, or technical defects.
+- Clearly distinguish observations from inferences.
+- Keep recommendations practical and specific.
+- Output only valid JSON with this exact shape:
+{
+  "overallScore": 0,
+  "summary": "",
+  "strengths": [""],
+  "opportunities": [
+    {
+      "title": "",
+      "impact": "High",
+      "finding": "",
+      "recommendation": ""
+    }
+  ],
+  "quickWins": [""],
+  "aiAutomationIdeas": [""],
+  "nextStep": "",
+  "disclaimer": ""
+}
+Return 3-5 opportunities, 3-5 quick wins, and 2-5 AI automation ideas.
+      `.trim(),
+      input: `
+Company: ${company}
+Website: ${website || "Not provided"}
+Audit focus: ${display(auditFocus)}
+Challenge: ${challenge}
+Goal: ${goal}
+Budget: ${budget ? display(budget) : "Not provided"}
+Timeline: ${display(timeline)}
+
+Public homepage text:
+${homepageText || "Unavailable. Base the audit on the submission and state that limitation."}
+      `.trim(),
+      max_output_tokens: 1500,
+      store: false,
+    });
+
+    const report = normalizeReport(
+      parseJson(response.output_text ?? ""),
+    );
+
+    const resendKey = process.env.RESEND_API_KEY;
+    const fromEmail = process.env.RESEND_FROM_EMAIL;
+    const toEmail = process.env.CONTACT_TO_EMAIL;
+
+    if (resendKey && fromEmail && toEmail) {
+      const resend = new Resend(resendKey);
+
+      const result = await resend.emails.send({
+        from: fromEmail,
+        to: [toEmail],
+        replyTo: email,
+        subject: `AI Audit Lead — ${company} — ${report.overallScore}/100`,
+        html: `
+          <div style="font-family:Arial,sans-serif;background:#09090b;color:#f4f4f5;padding:28px">
+            <div style="max-width:720px;margin:auto;background:#18181b;border:1px solid #27272a;border-radius:18px;padding:28px">
+              <h1 style="margin-top:0;color:#67e8f9">New AI Audit Lead</h1>
+              <p><strong>${escapeHtml(name)}</strong> — ${escapeHtml(company)}</p>
+              <p>${escapeHtml(email)}${phone ? ` · ${escapeHtml(phone)}` : ""}</p>
+              <p>${website ? escapeHtml(website) : "No website provided"}</p>
+              <p><strong>Challenge:</strong> ${escapeHtml(challenge)}</p>
+              <p><strong>Goal:</strong> ${escapeHtml(goal)}</p>
+              <hr style="border-color:#27272a;margin:24px 0" />
+              <h2>Audit score: ${report.overallScore}/100</h2>
+              <p>${escapeHtml(report.summary)}</p>
+              <h3>Priority opportunities</h3>
+              ${report.opportunities
+                .map(
+                  (item) => `
+                    <div style="margin:12px 0;padding:14px;background:#09090b;border-radius:10px">
+                      <strong>${escapeHtml(item.title)} — ${escapeHtml(item.impact)} impact</strong>
+                      <p>${escapeHtml(item.finding)}</p>
+                      <p><strong>Recommendation:</strong> ${escapeHtml(item.recommendation)}</p>
+                    </div>
+                  `,
+                )
+                .join("")}
+            </div>
+          </div>
+        `,
+      });
+
+      if (result.error) {
+        console.error("Audit email failed:", result.error);
       }
     }
 
-    const resend = new Resend(resendApiKey);
-
-    const safe = {
-      name: escapeHtml(name),
-      email: escapeHtml(email),
-      phone: escapeHtml(phone || "Not provided"),
-      company: escapeHtml(company),
-      website: escapeHtml(website || "Not provided"),
-      auditFocus: escapeHtml(displayValue(auditFocus)),
-      challenge: escapeHtml(challenge).replaceAll("\n", "<br />"),
-      goal: escapeHtml(goal).replaceAll("\n", "<br />"),
-      budget: escapeHtml(
-        budget ? displayValue(budget) : "Not provided",
-      ),
-      timeline: escapeHtml(displayValue(timeline)),
-    };
-
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: [contactEmail],
-      replyTo: email,
-      subject: `Free Audit Request — ${company}`,
-      html: `
-        <div style="background:#09090b;padding:32px;font-family:Arial,sans-serif;color:#f4f4f5">
-          <div style="max-width:720px;margin:0 auto;overflow:hidden;border:1px solid #27272a;border-radius:18px;background:#18181b">
-            <div style="padding:28px;background:linear-gradient(135deg,#0e7490,#2563eb)">
-              <p style="margin:0 0 8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#cffafe">
-                AH LLC
-              </p>
-              <h1 style="margin:0;font-size:26px;color:#ffffff">
-                New free audit request
-              </h1>
-            </div>
-
-            <div style="padding:28px">
-              <table role="presentation" style="width:100%;border-collapse:collapse">
-                <tr>
-                  <td style="width:170px;padding:10px 0;color:#a1a1aa">Name</td>
-                  <td style="padding:10px 0;color:#ffffff">${safe.name}</td>
-                </tr>
-                <tr>
-                  <td style="padding:10px 0;color:#a1a1aa">Email</td>
-                  <td style="padding:10px 0">
-                    <a href="mailto:${safe.email}" style="color:#67e8f9">${safe.email}</a>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:10px 0;color:#a1a1aa">Phone</td>
-                  <td style="padding:10px 0;color:#ffffff">${safe.phone}</td>
-                </tr>
-                <tr>
-                  <td style="padding:10px 0;color:#a1a1aa">Company</td>
-                  <td style="padding:10px 0;color:#ffffff">${safe.company}</td>
-                </tr>
-                <tr>
-                  <td style="padding:10px 0;color:#a1a1aa">Website</td>
-                  <td style="padding:10px 0;color:#ffffff">${safe.website}</td>
-                </tr>
-                <tr>
-                  <td style="padding:10px 0;color:#a1a1aa">Audit focus</td>
-                  <td style="padding:10px 0;color:#ffffff">${safe.auditFocus}</td>
-                </tr>
-                <tr>
-                  <td style="padding:10px 0;color:#a1a1aa">Budget</td>
-                  <td style="padding:10px 0;color:#ffffff">${safe.budget}</td>
-                </tr>
-                <tr>
-                  <td style="padding:10px 0;color:#a1a1aa">Timeline</td>
-                  <td style="padding:10px 0;color:#ffffff">${safe.timeline}</td>
-                </tr>
-              </table>
-
-              <div style="margin-top:24px;padding:20px;border-radius:12px;background:#09090b">
-                <h2 style="margin:0 0 10px;font-size:16px;color:#67e8f9">
-                  Biggest challenge
-                </h2>
-                <p style="margin:0;line-height:1.7;color:#e4e4e7">${safe.challenge}</p>
-              </div>
-
-              <div style="margin-top:16px;padding:20px;border-radius:12px;background:#09090b">
-                <h2 style="margin:0 0 10px;font-size:16px;color:#67e8f9">
-                  Desired result
-                </h2>
-                <p style="margin:0;line-height:1.7;color:#e4e4e7">${safe.goal}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      `,
-      text: [
-        "New AH LLC free audit request",
-        "",
-        `Name: ${name}`,
-        `Email: ${email}`,
-        `Phone: ${phone || "Not provided"}`,
-        `Company: ${company}`,
-        `Website: ${website || "Not provided"}`,
-        `Audit focus: ${displayValue(auditFocus)}`,
-        `Budget: ${budget ? displayValue(budget) : "Not provided"}`,
-        `Timeline: ${displayValue(timeline)}`,
-        "",
-        "Biggest challenge:",
-        challenge,
-        "",
-        "Desired result:",
-        goal,
-      ].join("\n"),
-    });
-
-    if (result.error) {
-      console.error("Resend free audit error:", result.error);
-
-      return NextResponse.json(
-        {
-          error:
-            "Your request could not be sent. Please try again shortly.",
-        },
-        { status: 502 },
-      );
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, report });
   } catch (error) {
     console.error("POST /api/free-audit failed:", error);
 
     return NextResponse.json(
-      {
-        error:
-          "Your audit request could not be submitted. Please try again.",
-      },
+      { error: "The instant audit could not be generated. Please try again." },
       { status: 500 },
     );
   }
