@@ -22,21 +22,117 @@ type AuditPayload = {
 
 type AuditImpact = "High" | "Medium" | "Low";
 
+type AuditOpportunity = {
+  title: string;
+  impact: AuditImpact;
+  finding: string;
+  recommendation: string;
+};
+
 type AuditReport = {
   overallScore: number;
   summary: string;
   strengths: string[];
-  opportunities: Array<{
-    title: string;
-    impact: AuditImpact;
-    finding: string;
-    recommendation: string;
-  }>;
+  opportunities: AuditOpportunity[];
   quickWins: string[];
   aiAutomationIdeas: string[];
   nextStep: string;
   disclaimer: string;
 };
+
+const AUDIT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    overallScore: {
+      type: "integer",
+      minimum: 0,
+      maximum: 100,
+    },
+    summary: {
+      type: "string",
+      minLength: 1,
+    },
+    strengths: {
+      type: "array",
+      minItems: 1,
+      maxItems: 4,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+    },
+    opportunities: {
+      type: "array",
+      minItems: 3,
+      maxItems: 5,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: {
+            type: "string",
+            minLength: 1,
+          },
+          impact: {
+            type: "string",
+            enum: ["High", "Medium", "Low"],
+          },
+          finding: {
+            type: "string",
+            minLength: 1,
+          },
+          recommendation: {
+            type: "string",
+            minLength: 1,
+          },
+        },
+        required: [
+          "title",
+          "impact",
+          "finding",
+          "recommendation",
+        ],
+      },
+    },
+    quickWins: {
+      type: "array",
+      minItems: 3,
+      maxItems: 5,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+    },
+    aiAutomationIdeas: {
+      type: "array",
+      minItems: 2,
+      maxItems: 5,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+    },
+    nextStep: {
+      type: "string",
+      minLength: 1,
+    },
+    disclaimer: {
+      type: "string",
+      minLength: 1,
+    },
+  },
+  required: [
+    "overallScore",
+    "summary",
+    "strengths",
+    "opportunities",
+    "quickWins",
+    "aiAutomationIdeas",
+    "nextStep",
+    "disclaimer",
+  ],
+} as const;
 
 function clean(value: unknown, maxLength = 4_000): string {
   return typeof value === "string"
@@ -48,6 +144,12 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function displayValue(value: string): string {
+  return value
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -57,120 +159,16 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
-function displayValue(value: string): string {
-  return value
-    .replaceAll("-", " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function normalizeImpact(value: unknown): AuditImpact {
-  if (value === "High" || value === "Medium" || value === "Low") {
-    return value;
+function normalizeWebsite(value: string): string {
+  if (!value) {
+    return "";
   }
 
-  return "Medium";
-}
+  const withProtocol = /^https?:\/\//i.test(value)
+    ? value
+    : `https://${value}`;
 
-function normalizeStringArray(
-  value: unknown,
-  maximum = 5,
-): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, maximum);
-}
-
-function normalizeReport(value: unknown): AuditReport {
-  const source =
-    value && typeof value === "object"
-      ? (value as Record<string, unknown>)
-      : {};
-
-  const parsedScore = Number(source.overallScore);
-
-  const opportunities: AuditReport["opportunities"] =
-    Array.isArray(source.opportunities)
-      ? source.opportunities
-          .filter(
-            (item): item is Record<string, unknown> =>
-              Boolean(item) && typeof item === "object",
-          )
-          .map(
-            (
-              item,
-            ): AuditReport["opportunities"][number] => ({
-              title:
-                typeof item.title === "string"
-                  ? item.title.trim()
-                  : "Growth opportunity",
-
-              impact: normalizeImpact(item.impact),
-
-              finding:
-                typeof item.finding === "string"
-                  ? item.finding.trim()
-                  : "",
-
-              recommendation:
-                typeof item.recommendation === "string"
-                  ? item.recommendation.trim()
-                  : "",
-            }),
-          )
-          .filter(
-            (item) =>
-              Boolean(
-                item.title &&
-                  item.finding &&
-                  item.recommendation,
-              ),
-          )
-          .slice(0, 5)
-      : [];
-
-  return {
-    overallScore: Number.isFinite(parsedScore)
-      ? Math.max(
-          0,
-          Math.min(100, Math.round(parsedScore)),
-        )
-      : 50,
-
-    summary:
-      typeof source.summary === "string" &&
-      source.summary.trim()
-        ? source.summary.trim()
-        : "This preliminary audit identifies practical growth opportunities based on the information provided.",
-
-    strengths: normalizeStringArray(source.strengths, 4),
-
-    opportunities,
-
-    quickWins: normalizeStringArray(source.quickWins, 5),
-
-    aiAutomationIdeas: normalizeStringArray(
-      source.aiAutomationIdeas,
-      5,
-    ),
-
-    nextStep:
-      typeof source.nextStep === "string" &&
-      source.nextStep.trim()
-        ? source.nextStep.trim()
-        : "Schedule a strategy call with AH LLC to validate priorities and plan implementation.",
-
-    disclaimer:
-      typeof source.disclaimer === "string" &&
-      source.disclaimer.trim()
-        ? source.disclaimer.trim()
-        : "This is a preliminary AI-generated audit based on submitted information and publicly accessible website content. It should be validated through a complete technical review.",
-  };
+  return new URL(withProtocol).toString();
 }
 
 function isPrivateHostname(hostname: string): boolean {
@@ -185,43 +183,37 @@ function isPrivateHostname(hostname: string): boolean {
     return true;
   }
 
-  const ipv4Match = normalized.match(
+  const match = normalized.match(
     /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/,
   );
 
-  if (!ipv4Match) {
+  if (!match) {
     return false;
   }
 
-  const firstOctet = Number(ipv4Match[1]);
-  const secondOctet = Number(ipv4Match[2]);
+  const octets = match.slice(1).map(Number);
+
+  if (octets.some((octet) => octet < 0 || octet > 255)) {
+    return true;
+  }
+
+  const [first, second] = octets;
 
   return (
-    firstOctet === 0 ||
-    firstOctet === 10 ||
-    firstOctet === 127 ||
-    (firstOctet === 169 && secondOctet === 254) ||
-    (firstOctet === 172 &&
-      secondOctet >= 16 &&
-      secondOctet <= 31) ||
-    (firstOctet === 192 && secondOctet === 168)
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
   );
 }
 
 function stripHtml(html: string): string {
   return html
-    .replace(
-      /<script\b[^>]*>[\s\S]*?<\/script>/gi,
-      " ",
-    )
-    .replace(
-      /<style\b[^>]*>[\s\S]*?<\/style>/gi,
-      " ",
-    )
-    .replace(
-      /<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi,
-      " ",
-    )
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
     .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, " ")
     .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<[^>]+>/g, " ")
@@ -234,9 +226,7 @@ function stripHtml(html: string): string {
     .slice(0, 12_000);
 }
 
-async function getHomepageText(
-  website: string,
-): Promise<string> {
+async function getHomepageText(website: string): Promise<string> {
   if (!website) {
     return "";
   }
@@ -244,10 +234,7 @@ async function getHomepageText(
   try {
     const url = new URL(website);
 
-    if (
-      url.protocol !== "http:" &&
-      url.protocol !== "https:"
-    ) {
+    if (!["http:", "https:"].includes(url.protocol)) {
       return "";
     }
 
@@ -256,10 +243,7 @@ async function getHomepageText(
     }
 
     const controller = new AbortController();
-
-    const timeout = setTimeout(() => {
-      controller.abort();
-    }, 8_000);
+    const timeout = setTimeout(() => controller.abort(), 8_000);
 
     try {
       const response = await fetch(url, {
@@ -268,8 +252,7 @@ async function getHomepageText(
         headers: {
           "User-Agent":
             "AHLLC-AuditBot/1.0 (+https://ahllc.biz)",
-          Accept:
-            "text/html,application/xhtml+xml",
+          Accept: "text/html,application/xhtml+xml",
         },
         cache: "no-store",
       });
@@ -285,23 +268,104 @@ async function getHomepageText(
         return "";
       }
 
-      const html = (await response.text()).slice(
-        0,
-        250_000,
-      );
-
+      const html = (await response.text()).slice(0, 250_000);
       return stripHtml(html);
     } finally {
       clearTimeout(timeout);
     }
   } catch (error) {
-    console.warn(
-      "The submitted homepage could not be read:",
-      error,
-    );
-
+    console.warn("Homepage fetch failed:", error);
     return "";
   }
+}
+
+function isAuditImpact(value: unknown): value is AuditImpact {
+  return (
+    value === "High" ||
+    value === "Medium" ||
+    value === "Low"
+  );
+}
+
+function assertAuditReport(value: unknown): AuditReport {
+  if (!value || typeof value !== "object") {
+    throw new Error("OpenAI returned an invalid audit object.");
+  }
+
+  const report = value as Record<string, unknown>;
+
+  if (
+    !Number.isInteger(report.overallScore) ||
+    Number(report.overallScore) < 0 ||
+    Number(report.overallScore) > 100
+  ) {
+    throw new Error("OpenAI returned an invalid overall score.");
+  }
+
+  if (
+    typeof report.summary !== "string" ||
+    typeof report.nextStep !== "string" ||
+    typeof report.disclaimer !== "string"
+  ) {
+    throw new Error("OpenAI returned incomplete audit text.");
+  }
+
+  const strengths = report.strengths;
+  const quickWins = report.quickWins;
+  const aiAutomationIdeas = report.aiAutomationIdeas;
+  const opportunities = report.opportunities;
+
+  if (
+    !Array.isArray(strengths) ||
+    !strengths.every((item) => typeof item === "string") ||
+    !Array.isArray(quickWins) ||
+    !quickWins.every((item) => typeof item === "string") ||
+    !Array.isArray(aiAutomationIdeas) ||
+    !aiAutomationIdeas.every((item) => typeof item === "string") ||
+    !Array.isArray(opportunities)
+  ) {
+    throw new Error("OpenAI returned invalid audit lists.");
+  }
+
+  const normalizedOpportunities: AuditOpportunity[] =
+    opportunities.map((item) => {
+      if (!item || typeof item !== "object") {
+        throw new Error(
+          "OpenAI returned an invalid opportunity.",
+        );
+      }
+
+      const opportunity = item as Record<string, unknown>;
+
+      if (
+        typeof opportunity.title !== "string" ||
+        !isAuditImpact(opportunity.impact) ||
+        typeof opportunity.finding !== "string" ||
+        typeof opportunity.recommendation !== "string"
+      ) {
+        throw new Error(
+          "OpenAI returned an incomplete opportunity.",
+        );
+      }
+
+      return {
+        title: opportunity.title,
+        impact: opportunity.impact,
+        finding: opportunity.finding,
+        recommendation: opportunity.recommendation,
+      };
+    });
+
+  return {
+    overallScore: Number(report.overallScore),
+    summary: report.summary,
+    strengths,
+    opportunities: normalizedOpportunities,
+    quickWins,
+    aiAutomationIdeas,
+    nextStep: report.nextStep,
+    disclaimer: report.disclaimer,
+  };
 }
 
 function createLeadEmailHtml({
@@ -310,8 +374,11 @@ function createLeadEmailHtml({
   phone,
   company,
   website,
+  auditFocus,
   challenge,
   goal,
+  budget,
+  timeline,
   report,
 }: {
   name: string;
@@ -319,50 +386,29 @@ function createLeadEmailHtml({
   phone: string;
   company: string;
   website: string;
+  auditFocus: string;
   challenge: string;
   goal: string;
+  budget: string;
+  timeline: string;
   report: AuditReport;
 }): string {
-  const opportunityHtml = report.opportunities
+  const list = (items: string[]) =>
+    items
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join("");
+
+  const opportunities = report.opportunities
     .map(
       (item) => `
-        <div
-          style="
-            margin: 14px 0;
-            padding: 16px;
-            background: #09090b;
-            border: 1px solid #27272a;
-            border-radius: 12px;
-          "
-        >
-          <p
-            style="
-              margin: 0 0 8px;
-              color: #67e8f9;
-              font-weight: 700;
-            "
-          >
-            ${escapeHtml(item.title)} ·
-            ${escapeHtml(item.impact)} impact
+        <div style="margin:14px 0;padding:16px;background:#09090b;border:1px solid #27272a;border-radius:12px;">
+          <p style="margin:0 0 8px;color:#67e8f9;font-weight:700;">
+            ${escapeHtml(item.title)} · ${escapeHtml(item.impact)} impact
           </p>
-
-          <p
-            style="
-              margin: 0 0 10px;
-              color: #d4d4d8;
-              line-height: 1.6;
-            "
-          >
+          <p style="margin:0 0 10px;color:#d4d4d8;line-height:1.6;">
             ${escapeHtml(item.finding)}
           </p>
-
-          <p
-            style="
-              margin: 0;
-              color: #f4f4f5;
-              line-height: 1.6;
-            "
-          >
+          <p style="margin:0;color:#f4f4f5;line-height:1.6;">
             <strong>Recommendation:</strong>
             ${escapeHtml(item.recommendation)}
           </p>
@@ -371,276 +417,57 @@ function createLeadEmailHtml({
     )
     .join("");
 
-  const strengthsHtml = report.strengths
-    .map((item) => `<li>${escapeHtml(item)}</li>`)
-    .join("");
-
-  const quickWinsHtml = report.quickWins
-    .map((item) => `<li>${escapeHtml(item)}</li>`)
-    .join("");
-
-  const automationHtml = report.aiAutomationIdeas
-    .map((item) => `<li>${escapeHtml(item)}</li>`)
-    .join("");
-
   return `
-    <div
-      style="
-        background: #09090b;
-        color: #f4f4f5;
-        padding: 32px;
-        font-family: Arial, sans-serif;
-      "
-    >
-      <div
-        style="
-          max-width: 760px;
-          margin: 0 auto;
-          overflow: hidden;
-          background: #18181b;
-          border: 1px solid #27272a;
-          border-radius: 18px;
-        "
-      >
-        <div
-          style="
-            padding: 28px;
-            background:
-              linear-gradient(135deg, #0e7490, #2563eb);
-          "
-        >
-          <p
-            style="
-              margin: 0 0 8px;
-              color: #cffafe;
-              font-size: 12px;
-              text-transform: uppercase;
-              letter-spacing: 0.14em;
-            "
-          >
+    <div style="background:#09090b;color:#f4f4f5;padding:32px;font-family:Arial,sans-serif;">
+      <div style="max-width:760px;margin:0 auto;background:#18181b;border:1px solid #27272a;border-radius:18px;overflow:hidden;">
+        <div style="padding:28px;background:linear-gradient(135deg,#0e7490,#2563eb);">
+          <p style="margin:0 0 8px;color:#cffafe;font-size:12px;text-transform:uppercase;letter-spacing:.14em;">
             AH LLC
           </p>
-
-          <h1
-            style="
-              margin: 0;
-              color: #ffffff;
-              font-size: 26px;
-            "
-          >
-            New AI audit lead
-          </h1>
+          <h1 style="margin:0;color:#fff;font-size:26px;">New AI audit lead</h1>
         </div>
 
-        <div style="padding: 28px;">
-          <p style="margin: 0; color: #ffffff;">
-            <strong>${escapeHtml(name)}</strong>
-            from
-            <strong>${escapeHtml(company)}</strong>
+        <div style="padding:28px;">
+          <p><strong>${escapeHtml(name)}</strong> from <strong>${escapeHtml(company)}</strong></p>
+          <p>
+            <a href="mailto:${escapeHtml(email)}" style="color:#67e8f9;">${escapeHtml(email)}</a>
+            ${phone ? ` · ${escapeHtml(phone)}` : ""}
           </p>
+          <p>${website ? escapeHtml(website) : "No website provided"}</p>
 
-          <p
-            style="
-              margin: 8px 0 0;
-              color: #d4d4d8;
-            "
-          >
-            <a
-              href="mailto:${escapeHtml(email)}"
-              style="color: #67e8f9;"
-            >
-              ${escapeHtml(email)}
-            </a>
-            ${
-              phone
-                ? ` · ${escapeHtml(phone)}`
-                : ""
-            }
-          </p>
-
-          <p
-            style="
-              margin: 8px 0 0;
-              color: #d4d4d8;
-            "
-          >
-            ${
-              website
-                ? escapeHtml(website)
-                : "No website provided"
-            }
-          </p>
-
-          <div
-            style="
-              margin-top: 22px;
-              padding: 18px;
-              background: #09090b;
-              border-radius: 12px;
-            "
-          >
-            <p
-              style="
-                margin: 0 0 10px;
-                color: #d4d4d8;
-                line-height: 1.6;
-              "
-            >
-              <strong>Challenge:</strong>
-              ${escapeHtml(challenge)}
-            </p>
-
-            <p
-              style="
-                margin: 0;
-                color: #d4d4d8;
-                line-height: 1.6;
-              "
-            >
-              <strong>Goal:</strong>
-              ${escapeHtml(goal)}
-            </p>
+          <div style="margin-top:20px;padding:18px;background:#09090b;border-radius:12px;">
+            <p><strong>Audit focus:</strong> ${escapeHtml(displayValue(auditFocus))}</p>
+            <p><strong>Budget:</strong> ${escapeHtml(budget ? displayValue(budget) : "Not provided")}</p>
+            <p><strong>Timeline:</strong> ${escapeHtml(displayValue(timeline))}</p>
+            <p><strong>Challenge:</strong> ${escapeHtml(challenge)}</p>
+            <p><strong>Goal:</strong> ${escapeHtml(goal)}</p>
           </div>
 
-          <div
-            style="
-              margin-top: 24px;
-              padding: 22px;
-              background: #111827;
-              border-radius: 14px;
-            "
-          >
-            <p
-              style="
-                margin: 0;
-                color: #67e8f9;
-                font-size: 13px;
-                text-transform: uppercase;
-                letter-spacing: 0.12em;
-              "
-            >
+          <div style="margin-top:24px;padding:22px;background:#111827;border-radius:14px;">
+            <p style="margin:0;color:#67e8f9;font-size:13px;text-transform:uppercase;letter-spacing:.12em;">
               Instant AI audit
             </p>
-
-            <h2
-              style="
-                margin: 8px 0 0;
-                color: #ffffff;
-                font-size: 26px;
-              "
-            >
-              Overall score:
-              ${report.overallScore}/100
+            <h2 style="margin:8px 0 0;color:#fff;font-size:26px;">
+              Overall score: ${report.overallScore}/100
             </h2>
+            <p style="color:#d4d4d8;line-height:1.7;">${escapeHtml(report.summary)}</p>
 
-            <p
-              style="
-                margin: 14px 0 0;
-                color: #d4d4d8;
-                line-height: 1.7;
-              "
-            >
-              ${escapeHtml(report.summary)}
-            </p>
+            <h3>Strengths</h3>
+            <ul style="color:#d4d4d8;line-height:1.8;">${list(report.strengths)}</ul>
 
-            <h3
-              style="
-                margin: 24px 0 8px;
-                color: #ffffff;
-              "
-            >
-              Strengths
-            </h3>
+            <h3>Priority opportunities</h3>
+            ${opportunities}
 
-            <ul
-              style="
-                margin: 0;
-                padding-left: 20px;
-                color: #d4d4d8;
-                line-height: 1.8;
-              "
-            >
-              ${strengthsHtml}
-            </ul>
+            <h3>Quick wins</h3>
+            <ul style="color:#d4d4d8;line-height:1.8;">${list(report.quickWins)}</ul>
 
-            <h3
-              style="
-                margin: 24px 0 8px;
-                color: #ffffff;
-              "
-            >
-              Priority opportunities
-            </h3>
+            <h3>AI and automation opportunities</h3>
+            <ul style="color:#d4d4d8;line-height:1.8;">${list(report.aiAutomationIdeas)}</ul>
 
-            ${opportunityHtml}
+            <h3>Recommended next step</h3>
+            <p style="color:#d4d4d8;line-height:1.7;">${escapeHtml(report.nextStep)}</p>
 
-            <h3
-              style="
-                margin: 24px 0 8px;
-                color: #ffffff;
-              "
-            >
-              Quick wins
-            </h3>
-
-            <ul
-              style="
-                margin: 0;
-                padding-left: 20px;
-                color: #d4d4d8;
-                line-height: 1.8;
-              "
-            >
-              ${quickWinsHtml}
-            </ul>
-
-            <h3
-              style="
-                margin: 24px 0 8px;
-                color: #ffffff;
-              "
-            >
-              AI and automation opportunities
-            </h3>
-
-            <ul
-              style="
-                margin: 0;
-                padding-left: 20px;
-                color: #d4d4d8;
-                line-height: 1.8;
-              "
-            >
-              ${automationHtml}
-            </ul>
-
-            <h3
-              style="
-                margin: 24px 0 8px;
-                color: #ffffff;
-              "
-            >
-              Recommended next step
-            </h3>
-
-            <p
-              style="
-                margin: 0;
-                color: #d4d4d8;
-                line-height: 1.7;
-              "
-            >
-              ${escapeHtml(report.nextStep)}
-            </p>
-
-            <p
-              style="
-                margin: 24px 0 0;
-                color: #71717a;
-                font-size: 12px;
-                line-height: 1.6;
-              "
-            >
+            <p style="margin-top:24px;color:#71717a;font-size:12px;line-height:1.6;">
               ${escapeHtml(report.disclaimer)}
             </p>
           </div>
@@ -648,6 +475,97 @@ function createLeadEmailHtml({
       </div>
     </div>
   `;
+}
+
+async function sendLeadEmail({
+  name,
+  email,
+  phone,
+  company,
+  website,
+  auditFocus,
+  challenge,
+  goal,
+  budget,
+  timeline,
+  report,
+}: {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  website: string;
+  auditFocus: string;
+  challenge: string;
+  goal: string;
+  budget: string;
+  timeline: string;
+  report: AuditReport;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL;
+  const to = process.env.CONTACT_TO_EMAIL;
+
+  if (!apiKey || !from || !to) {
+    console.warn(
+      "Audit generated, but Resend environment variables are incomplete.",
+    );
+    return;
+  }
+
+  const resend = new Resend(apiKey);
+
+  const result = await resend.emails.send({
+    from,
+    to: [to],
+    replyTo: email,
+    subject: `AI Audit Lead — ${company} — ${report.overallScore}/100`,
+    html: createLeadEmailHtml({
+      name,
+      email,
+      phone,
+      company,
+      website,
+      auditFocus,
+      challenge,
+      goal,
+      budget,
+      timeline,
+      report,
+    }),
+    text: [
+      "New AH LLC AI audit lead",
+      "",
+      `Name: ${name}`,
+      `Company: ${company}`,
+      `Email: ${email}`,
+      `Phone: ${phone || "Not provided"}`,
+      `Website: ${website || "Not provided"}`,
+      `Audit focus: ${displayValue(auditFocus)}`,
+      `Budget: ${budget ? displayValue(budget) : "Not provided"}`,
+      `Timeline: ${displayValue(timeline)}`,
+      "",
+      `Challenge: ${challenge}`,
+      "",
+      `Goal: ${goal}`,
+      "",
+      `Audit score: ${report.overallScore}/100`,
+      "",
+      report.summary,
+      "",
+      "Priority opportunities:",
+      ...report.opportunities.map(
+        (item, index) =>
+          `${index + 1}. ${item.title} (${item.impact})\nFinding: ${item.finding}\nRecommendation: ${item.recommendation}`,
+      ),
+      "",
+      `Recommended next step: ${report.nextStep}`,
+    ].join("\n"),
+  });
+
+  if (result.error) {
+    console.error("Audit lead email failed:", result.error);
+  }
 }
 
 export async function GET() {
@@ -667,8 +585,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const openAiApiKey =
-      process.env.OPENAI_API_KEY;
+    const openAiApiKey = process.env.OPENAI_API_KEY;
 
     if (!openAiApiKey) {
       return NextResponse.json(
@@ -682,21 +599,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const body =
-      (await request.json()) as AuditPayload;
+    let body: AuditPayload;
+
+    try {
+      body = (await request.json()) as AuditPayload;
+    } catch {
+      return NextResponse.json(
+        {
+          error: "The request body must be valid JSON.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
 
     const name = clean(body.name, 120);
-    const email = clean(
-      body.email,
-      254,
-    ).toLowerCase();
+    const email = clean(body.email, 254).toLowerCase();
     const phone = clean(body.phone, 50);
     const company = clean(body.company, 160);
-    const website = clean(body.website, 500);
-    const auditFocus = clean(
-      body.auditFocus,
-      100,
-    );
+    const rawWebsite = clean(body.website, 500);
+    const auditFocus = clean(body.auditFocus, 100);
     const challenge = clean(body.challenge);
     const goal = clean(body.goal);
     const budget = clean(body.budget, 100);
@@ -714,8 +637,7 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         {
-          error:
-            "Please complete all required fields.",
+          error: "Please complete all required fields.",
         },
         {
           status: 400,
@@ -726,8 +648,7 @@ export async function POST(request: Request) {
     if (!isValidEmail(email)) {
       return NextResponse.json(
         {
-          error:
-            "Please enter a valid email address.",
+          error: "Please enter a valid email address.",
         },
         {
           status: 400,
@@ -747,27 +668,19 @@ export async function POST(request: Request) {
       );
     }
 
-    if (website) {
-      try {
-        const parsedWebsite = new URL(website);
+    let website = "";
 
-        if (
-          parsedWebsite.protocol !== "http:" &&
-          parsedWebsite.protocol !== "https:"
-        ) {
-          throw new Error(
-            "Unsupported website protocol.",
-          );
+    if (rawWebsite) {
+      try {
+        website = normalizeWebsite(rawWebsite);
+        const url = new URL(website);
+
+        if (!["http:", "https:"].includes(url.protocol)) {
+          throw new Error("Unsupported protocol.");
         }
 
-        if (
-          isPrivateHostname(
-            parsedWebsite.hostname,
-          )
-        ) {
-          throw new Error(
-            "Private network URLs are not allowed.",
-          );
+        if (isPrivateHostname(url.hostname)) {
+          throw new Error("Private hostname.");
         }
       } catch {
         return NextResponse.json(
@@ -782,8 +695,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const homepageText =
-      await getHomepageText(website);
+    const homepageText = await getHomepageText(website);
 
     const openai = new OpenAI({
       apiKey: openAiApiKey,
@@ -797,43 +709,29 @@ export async function POST(request: Request) {
       instructions: `
 You are a senior business-growth, website-conversion, SEO, AI, and automation consultant for AH LLC.
 
-Create a useful preliminary audit from the visitor's submitted business information and any publicly accessible homepage text.
+Create a practical preliminary audit using the visitor's submitted information and any supplied public homepage text.
 
 Rules:
-- Never invent analytics, rankings, page-speed scores, revenue, conversion rates, guarantees, clients, or technical defects.
+- Never invent analytics, rankings, speed scores, revenue, conversion rates, guarantees, clients, or technical defects.
 - Clearly distinguish direct observations from reasonable inferences.
-- Do not claim that you tested site speed, analytics, security, accessibility, search rankings, or backend systems.
-- Keep recommendations practical, specific, and concise.
-- The overall score is a preliminary growth-readiness and opportunity score, not a certified technical score.
+- Do not claim that you tested analytics, security, accessibility, rankings, page speed, or backend systems.
+- Keep recommendations specific, concise, and useful.
+- Treat the score as a preliminary growth-readiness and opportunity score, not a certified technical score.
 - Use plain business language.
+- Keep the entire report concise enough to fit comfortably within the response limit.
       `.trim(),
 
       input: `
 BUSINESS SUBMISSION
 
-Name:
-${name}
-
-Company:
-${company}
-
-Website:
-${website || "Not provided"}
-
-Audit focus:
-${displayValue(auditFocus)}
-
-Biggest challenge:
-${challenge}
-
-Desired result:
-${goal}
-
-Budget:
-${budget ? displayValue(budget) : "Not provided"}
-
-Timeline:
-${displayValue(timeline)}
+Name: ${name}
+Company: ${company}
+Website: ${website || "Not provided"}
+Audit focus: ${displayValue(auditFocus)}
+Biggest challenge: ${challenge}
+Desired result: ${goal}
+Budget: ${budget ? displayValue(budget) : "Not provided"}
+Timeline: ${displayValue(timeline)}
 
 PUBLIC HOMEPAGE TEXT
 
@@ -848,100 +746,24 @@ ${
           type: "json_schema",
           name: "audit_report",
           strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              overallScore: {
-                type: "integer",
-                minimum: 0,
-                maximum: 100,
-              },
-              summary: {
-                type: "string",
-              },
-              strengths: {
-                type: "array",
-                items: {
-                  type: "string",
-                },
-                minItems: 1,
-                maxItems: 4,
-              },
-              opportunities: {
-                type: "array",
-                minItems: 3,
-                maxItems: 5,
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    title: {
-                      type: "string",
-                    },
-                    impact: {
-                      type: "string",
-                      enum: [
-                        "High",
-                        "Medium",
-                        "Low",
-                      ],
-                    },
-                    finding: {
-                      type: "string",
-                    },
-                    recommendation: {
-                      type: "string",
-                    },
-                  },
-                  required: [
-                    "title",
-                    "impact",
-                    "finding",
-                    "recommendation",
-                  ],
-                },
-              },
-              quickWins: {
-                type: "array",
-                items: {
-                  type: "string",
-                },
-                minItems: 3,
-                maxItems: 5,
-              },
-              aiAutomationIdeas: {
-                type: "array",
-                items: {
-                  type: "string",
-                },
-                minItems: 2,
-                maxItems: 5,
-              },
-              nextStep: {
-                type: "string",
-              },
-              disclaimer: {
-                type: "string",
-              },
-            },
-            required: [
-              "overallScore",
-              "summary",
-              "strengths",
-              "opportunities",
-              "quickWins",
-              "aiAutomationIdeas",
-              "nextStep",
-              "disclaimer",
-            ],
-          },
+          schema: AUDIT_SCHEMA,
         },
       },
 
-      max_output_tokens: 1_500,
+      max_output_tokens: 4_000,
       store: false,
     });
+
+    if (response.status === "incomplete") {
+      console.error(
+        "OpenAI response incomplete:",
+        response.incomplete_details,
+      );
+
+      throw new Error(
+        "The audit response was interrupted before completion. Please try again.",
+      );
+    }
 
     if (!response.output_text) {
       throw new Error(
@@ -949,97 +771,49 @@ ${
       );
     }
 
-    const report = normalizeReport(
-      JSON.parse(response.output_text) as unknown,
-    );
+    let parsed: unknown;
 
-    const resendApiKey =
-      process.env.RESEND_API_KEY;
-    const fromEmail =
-      process.env.RESEND_FROM_EMAIL;
-    const contactEmail =
-      process.env.CONTACT_TO_EMAIL;
-
-    if (
-      resendApiKey &&
-      fromEmail &&
-      contactEmail
-    ) {
-      const resend = new Resend(
-        resendApiKey,
+    try {
+      parsed = JSON.parse(response.output_text) as unknown;
+    } catch (error) {
+      console.error(
+        "Structured audit output could not be parsed:",
+        {
+          error,
+          status: response.status,
+          incompleteDetails: response.incomplete_details,
+          outputLength: response.output_text.length,
+          outputPreview: response.output_text.slice(0, 500),
+        },
       );
 
-      const emailResult =
-        await resend.emails.send({
-          from: fromEmail,
-          to: [contactEmail],
-          replyTo: email,
-          subject: `AI Audit Lead — ${company} — ${report.overallScore}/100`,
-          html: createLeadEmailHtml({
-            name,
-            email,
-            phone,
-            company,
-            website,
-            challenge,
-            goal,
-            report,
-          }),
-          text: [
-            "New AH LLC AI audit lead",
-            "",
-            `Name: ${name}`,
-            `Company: ${company}`,
-            `Email: ${email}`,
-            `Phone: ${phone || "Not provided"}`,
-            `Website: ${website || "Not provided"}`,
-            `Audit focus: ${displayValue(auditFocus)}`,
-            `Budget: ${
-              budget
-                ? displayValue(budget)
-                : "Not provided"
-            }`,
-            `Timeline: ${displayValue(timeline)}`,
-            "",
-            `Challenge: ${challenge}`,
-            "",
-            `Goal: ${goal}`,
-            "",
-            `Audit score: ${report.overallScore}/100`,
-            "",
-            report.summary,
-            "",
-            "Priority opportunities:",
-            ...report.opportunities.map(
-              (item, index) =>
-                `${index + 1}. ${item.title} (${item.impact})\nFinding: ${item.finding}\nRecommendation: ${item.recommendation}`,
-            ),
-            "",
-            `Recommended next step: ${report.nextStep}`,
-          ].join("\n"),
-        });
-
-      if (emailResult.error) {
-        console.error(
-          "Audit lead email failed:",
-          emailResult.error,
-        );
-      }
-    } else {
-      console.warn(
-        "The audit was generated, but Resend environment variables are incomplete.",
+      throw new Error(
+        "The audit response was not valid structured data. Please try again.",
       );
     }
+
+    const report = assertAuditReport(parsed);
+
+    await sendLeadEmail({
+      name,
+      email,
+      phone,
+      company,
+      website,
+      auditFocus,
+      challenge,
+      goal,
+      budget,
+      timeline,
+      report,
+    });
 
     return NextResponse.json({
       success: true,
       report,
     });
   } catch (error) {
-    console.error(
-      "POST /api/free-audit failed:",
-      error,
-    );
+    console.error("POST /api/free-audit failed:", error);
 
     const message =
       error instanceof Error
