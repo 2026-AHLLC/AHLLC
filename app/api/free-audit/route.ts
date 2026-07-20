@@ -831,24 +831,39 @@ ${
       report,
     });
 
-await supabase.from("audit_leads").insert({
-  name,
-  email,
-  phone,
-  company,
-  website,
-  audit_focus: auditFocus,
-  challenge,
-  goal,
-  budget,
-  timeline,
-  overall_score: report.overallScore,
-  report,
-});
 
 
+if (supabase) {
+  const { error: supabaseError } = await supabase
+    .from("audit_leads")
+    .insert({
+      name,
+      email,
+      phone: phone || null,
+      company,
+      website: website || null,
+      audit_focus: auditFocus,
+      challenge,
+      goal,
+      budget: budget || null,
+      timeline,
+      overall_score: report.overallScore,
+      report,
+      status: "new",
+      contacted: false,
+    });
 
-
+  if (supabaseError) {
+    console.error(
+      "Supabase audit lead insert failed:",
+      supabaseError,
+    );
+  }
+} else {
+  console.warn(
+    "Supabase environment variables are missing.",
+  );
+}
 
 
 
