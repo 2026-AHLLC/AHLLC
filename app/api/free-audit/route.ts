@@ -808,6 +808,27 @@ ${
       report,
     });
 
+await supabase.from("audit_leads").insert({
+  name,
+  email,
+  phone,
+  company,
+  website,
+  audit_focus: auditFocus,
+  challenge,
+  goal,
+  budget,
+  timeline,
+  overall_score: report.overallScore,
+  report,
+});
+
+
+
+
+
+
+
     return NextResponse.json({
       success: true,
       report,
