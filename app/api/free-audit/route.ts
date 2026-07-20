@@ -994,20 +994,20 @@ ${
       success: true,
       report,
     });
-  } catch (error) {
-    console.error(
-      "POST /api/free-audit failed:",
-      error,
-    );
+  }catch (error) {
+  console.error("POST /api/free-audit failed:", error);
 
-    return NextResponse.json(
-      {
-        error:
-          "The instant audit could not be generated. Please try again.",
-      },
-      {
-        status: 500,
-      },
-    );
-  }
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error);
+
+  return NextResponse.json(
+    {
+      error: message,
+    },
+    {
+      status: 500,
+    },
+  );
 }
