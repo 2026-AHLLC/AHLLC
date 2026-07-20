@@ -18,7 +18,6 @@ type AuditPayload = {
   budget?: unknown;
   timeline?: unknown;
   consent?: unknown;
-  companyWebsite?: unknown;
 };
 
 type AuditImpact = "High" | "Medium" | "Low";
@@ -706,13 +705,6 @@ export async function POST(request: Request) {
 
     const body =
       (await request.json()) as AuditPayload;
-
-    // Honeypot spam field.
-    if (clean(body.companyWebsite, 200)) {
-      return NextResponse.json({
-        success: true,
-      });
-    }
 
     const name = clean(body.name, 120);
     const email = clean(
