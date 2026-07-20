@@ -117,52 +117,70 @@ export default function FreeAuditPage() {
     }));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
+  async function handleSubmit(
+  event: FormEvent<HTMLFormElement>,
+) {
+  event.preventDefault();
 
-    if (!form.consent) {
-      setError(
-        "Please confirm that AH LLC may contact you about your audit request.",
-      );
-      return;
-    }
+  setError("");
 
-    setIsSubmitting(true);
-
-    try {
-      const response = await fetch("/api/free-audit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...form,
-          website: normalizeWebsite(form.website),
-        }),
-      });
-
-      const data = (await response.json()) as {
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ??
-            "Your audit request could not be submitted.",
-        );
-      }
-
-      router.push("/free-audit/success");
-    } catch (submissionError) {
-      setError(
-        submissionError instanceof Error
-          ? submissionError.message
-          : "Your audit request could not be submitted.",
-      );
-      setIsSubmitting(false);
-    }
+  if (!form.consent) {
+    setError(
+      "Please confirm that AH LLC may contact you about your audit request.",
+    );
+    return;
   }
+
+  setIsSubmitting(true);
+
+  try {
+    const response = await fetch("/api/free-audit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...form,
+        website: normalizeWebsite(form.website),
+      }),
+    });
+
+    const data = (await response.json()) as {
+      error?: string;
+      report?: unknown;
+    };
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ??
+          "Your audit request could not be submitted.",
+      );
+    }
+
+    if (!data.report) {
+      throw new Error(
+        "The audit report was not returned."
+      );
+    }
+
+    sessionStorage.setItem(
+      "ahllc-instant-audit-report",
+      JSON.stringify(data.report)
+    );
+
+    router.push("/free-audit/result");
+  } catch (err) {
+    console.error(err);
+
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Your audit request could not be submitted."
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+}
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white">
