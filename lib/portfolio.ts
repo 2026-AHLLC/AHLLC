@@ -10,14 +10,6 @@ export interface PortfolioProject {
   results: string[];
 }
 
-import ahllc from "@/content/portfolio/ah-llc";
-import bewise from "@/content/portfolio/bewise-contractors";
-
-
-export const portfolio = [
-  ahllc,
-
-];
 
 export function getProject(slug: string) {
   return portfolio.find((p) => p.slug === slug);
