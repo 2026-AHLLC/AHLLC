@@ -49,8 +49,11 @@ export const metadata: Metadata = {
   ],
 
   creator: "AH LLC",
-
   publisher: "AH LLC",
+
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+  },
 
   robots: {
     index: true,
@@ -68,15 +71,10 @@ export const metadata: Metadata = {
     title: "AH LLC | AI • Automation • Growth",
     description:
       "AI-powered business growth through automation, websites, SEO, and marketing.",
-
     url: siteUrl,
-
     siteName: "AH LLC",
-
     locale: "en_US",
-
     type: "website",
-
     images: [
       {
         url: "/og-image.jpg",
@@ -92,7 +90,6 @@ export const metadata: Metadata = {
     title: "AH LLC",
     description:
       "AI-powered websites, automation, and business growth.",
-
     images: ["/og-image.jpg"],
   },
 
@@ -114,53 +111,38 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-
     name: "AH LLC",
-
     url: siteUrl,
-
     logo: `${siteUrl}/logo.png`,
-
     description:
-      "AI-powered websites, automation, SEO and business growth.",
-
+      "AI-powered websites, automation, SEO, and business growth.",
     sameAs: [],
   };
 
   const localBusinessSchema = {
     "@context": "https://schema.org",
-
     "@type": "ProfessionalService",
-
     name: "AH LLC",
-
     url: siteUrl,
-
     image: `${siteUrl}/og-image.jpg`,
-
-    telephone: "+1-631-555-1234",
-
     areaServed: [
       "Long Island",
       "New York",
       "United States",
     ],
-
     priceRange: "$$",
   };
 
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-    >
+    <html lang="en" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${inter.variable} bg-zinc-950 text-white antialiased`}
       >
         <script
@@ -179,20 +161,10 @@ export default function RootLayout({
 
         {children}
 
+        <AHChatbot />
         <Toaster />
-
         <Analytics />
         <SpeedInsights />
-
-
-        <body>
-
-  {children}
-  
-  <AHChatbot />
-</body>
-
-
       </body>
     </html>
   );
