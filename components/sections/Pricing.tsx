@@ -36,7 +36,7 @@ const plans: PricingPlan[] = [
   },
   {
     name: "Growth",
-    price: "$2,499",
+    price: "$1,999",
     description: "Our most popular package for growing businesses.",
     featured: true,
     cta: "/contact",

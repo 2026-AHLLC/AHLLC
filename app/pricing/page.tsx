@@ -18,7 +18,7 @@ export const metadata = {
 const plans = [
   {
     name: "Starter",
-    price: "Starting at $1,500",
+    price: "Starting at $999",
     featured: false,
     description:
       "Ideal for startups and small businesses looking to establish a professional online presence.",
@@ -33,7 +33,7 @@ const plans = [
   },
   {
     name: "Growth",
-    price: "Starting at $3,500",
+    price: "Starting at $1,999",
     featured: true,
     description:
       "Our most popular package for businesses focused on lead generation and growth.",
