@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ??
-  "https://ahllc.biz";
+  "https://ahllc.mobi";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
