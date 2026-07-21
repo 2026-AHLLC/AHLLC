@@ -1,11 +1,11 @@
 "use client";
 
 import type { Route } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
   Menu,
-  Sparkles,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -62,10 +62,14 @@ export default function Navbar() {
           className="group inline-flex items-center gap-3"
           aria-label="AH LLC home"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10">
-            <Sparkles
-              className="h-4 w-4 text-cyan-400"
-              aria-hidden="true"
+          <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 shadow-sm shadow-black/20">
+            <Image
+              src="/ah-logo-black.png"
+              alt=""
+              width={32}
+              height={32}
+              priority
+              className="h-full w-full object-contain"
             />
           </span>
 
@@ -124,10 +128,13 @@ export default function Navbar() {
               <div className="flex min-h-full flex-col">
                 <SheetHeader className="border-b border-white/10 px-6 py-6 text-left">
                   <SheetTitle className="flex items-center gap-3 text-white">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10">
-                      <Sparkles
-                        className="h-5 w-5 text-cyan-400"
-                        aria-hidden="true"
+                    <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 shadow-sm shadow-black/20">
+                      <Image
+                        src="/ah-logo-black.png"
+                        alt=""
+                        width={36}
+                        height={36}
+                        className="h-full w-full object-contain"
                       />
                     </span>
 
