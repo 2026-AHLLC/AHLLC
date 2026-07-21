@@ -41,7 +41,7 @@ const navigation: NavItem[] = [
   {
     title: "Pricing",
     href: "/pricing",
-    description: "Compare plans and secure checkout options.",
+    description: "Compare plans and checkout options.",
   },
   {
     title: "Contact",
