@@ -26,7 +26,6 @@ const navigation: NavItem[] = [
   {
     title: "Home",
     href: "/",
-    description: "Return to the AH LLC homepage.",
   },
   {
     title: "Services",
