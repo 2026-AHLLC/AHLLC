@@ -41,27 +41,35 @@ type AuditReport = {
   disclaimer: string;
 };
 
+type AuditEmailInput = {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  website: string;
+  auditFocus: string;
+  challenge: string;
+  goal: string;
+  budget: string;
+  timeline: string;
+  report: AuditReport;
+};
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL;
+const CALENDAR_URL = "https://cal.com/john-egan-2025/30min";
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const supabase =
   supabaseUrl && supabaseServiceRoleKey
-    ? createClient(
-        supabaseUrl,
-        supabaseServiceRoleKey,
-        {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-          },
+    ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
         },
-      )
+      })
     : null;
-
 
 const AUDIT_SCHEMA = {
   type: "object",
@@ -403,19 +411,7 @@ function createLeadEmailHtml({
   budget,
   timeline,
   report,
-}: {
-  name: string;
-  email: string;
-  phone: string;
-  company: string;
-  website: string;
-  auditFocus: string;
-  challenge: string;
-  goal: string;
-  budget: string;
-  timeline: string;
-  report: AuditReport;
-}): string {
+}: AuditEmailInput): string {
   const list = (items: string[]) =>
     items
       .map((item) => `<li>${escapeHtml(item)}</li>`)
@@ -500,36 +496,91 @@ function createLeadEmailHtml({
   `;
 }
 
-async function sendLeadEmail({
+function createCustomerEmailHtml({
   name,
-  email,
-  phone,
   company,
-  website,
-  auditFocus,
-  challenge,
-  goal,
-  budget,
-  timeline,
   report,
-}: {
-  name: string;
-  email: string;
-  phone: string;
-  company: string;
-  website: string;
-  auditFocus: string;
-  challenge: string;
-  goal: string;
-  budget: string;
-  timeline: string;
-  report: AuditReport;
-}): Promise<void> {
+}: Pick<AuditEmailInput, "name" | "company" | "report">): string {
+  const quickWins = report.quickWins
+    .slice(0, 3)
+    .map(
+      (item) =>
+        `<li style="margin-bottom:10px;">${escapeHtml(item)}</li>`,
+    )
+    .join("");
+
+  return `
+    <div style="margin:0;padding:32px 16px;background:#09090b;font-family:Arial,Helvetica,sans-serif;color:#ffffff;">
+      <div style="max-width:640px;margin:0 auto;overflow:hidden;border:1px solid #27272a;border-radius:20px;background:#18181b;">
+        <div style="padding:28px;background:linear-gradient(135deg,#ca8a04,#2563eb);">
+          <p style="margin:0 0 8px;color:#fef3c7;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">
+            AH LLC Instant AI Audit
+          </p>
+          <h1 style="margin:0;color:#ffffff;font-size:28px;line-height:1.25;">
+            Your preliminary business audit is ready
+          </h1>
+        </div>
+
+        <div style="padding:30px;">
+          <p style="margin:0;color:#e4e4e7;font-size:16px;line-height:1.7;">
+            Hi ${escapeHtml(name)},
+          </p>
+
+          <p style="margin:14px 0 0;color:#d4d4d8;font-size:16px;line-height:1.7;">
+            Thank you for requesting an AH LLC audit for
+            <strong style="color:#ffffff;">${escapeHtml(company)}</strong>.
+            Your preliminary growth-readiness score is
+            <strong style="color:#67e8f9;">${report.overallScore}/100</strong>.
+          </p>
+
+          <div style="margin:24px 0;padding:20px;border:1px solid #164e63;border-radius:14px;background:#0f2529;">
+            <h2 style="margin:0;color:#ffffff;font-size:18px;">
+              Audit summary
+            </h2>
+            <p style="margin:10px 0 0;color:#d4d4d8;font-size:14px;line-height:1.7;">
+              ${escapeHtml(report.summary)}
+            </p>
+          </div>
+
+          <h2 style="margin:24px 0 12px;color:#ffffff;font-size:18px;">
+            Three quick wins
+          </h2>
+
+          <ul style="margin:0;padding-left:22px;color:#d4d4d8;font-size:14px;line-height:1.7;">
+            ${quickWins}
+          </ul>
+
+          <div style="margin:26px 0;padding:20px;border:1px solid #3f3f46;border-radius:14px;background:#09090b;">
+            <h2 style="margin:0;color:#ffffff;font-size:18px;">
+              Recommended next step
+            </h2>
+            <p style="margin:10px 0 0;color:#d4d4d8;font-size:14px;line-height:1.7;">
+              ${escapeHtml(report.nextStep)}
+            </p>
+          </div>
+
+          <a
+            href="${CALENDAR_URL}"
+            style="display:inline-block;padding:14px 22px;border-radius:10px;background:#22d3ee;color:#09090b;font-weight:700;text-decoration:none;"
+          >
+            Book Your Free 30-Minute Strategy Call
+          </a>
+
+          <p style="margin:26px 0 0;color:#71717a;font-size:12px;line-height:1.6;">
+            ${escapeHtml(report.disclaimer)}
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function sendAuditEmails(input: AuditEmailInput): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
-  const to = process.env.CONTACT_TO_EMAIL;
+  const contactEmail = process.env.CONTACT_TO_EMAIL;
 
-  if (!apiKey || !from || !to) {
+  if (!apiKey || !from || !contactEmail) {
     console.warn(
       "Audit generated, but Resend environment variables are incomplete.",
     );
@@ -538,56 +589,80 @@ async function sendLeadEmail({
 
   const resend = new Resend(apiKey);
 
-  const result = await resend.emails.send({
+  const leadResult = await resend.emails.send({
     from,
-    to: [to],
-    replyTo: email,
-    subject: `AI Audit Lead — ${company} — ${report.overallScore}/100`,
-    html: createLeadEmailHtml({
-      name,
-      email,
-      phone,
-      company,
-      website,
-      auditFocus,
-      challenge,
-      goal,
-      budget,
-      timeline,
-      report,
-    }),
+    to: [contactEmail],
+    replyTo: input.email,
+    subject: `AI Audit Lead — ${input.company} — ${input.report.overallScore}/100`,
+    html: createLeadEmailHtml(input),
     text: [
       "New AH LLC AI audit lead",
       "",
-      `Name: ${name}`,
-      `Company: ${company}`,
-      `Email: ${email}`,
-      `Phone: ${phone || "Not provided"}`,
-      `Website: ${website || "Not provided"}`,
-      `Audit focus: ${displayValue(auditFocus)}`,
-      `Budget: ${budget ? displayValue(budget) : "Not provided"}`,
-      `Timeline: ${displayValue(timeline)}`,
+      `Name: ${input.name}`,
+      `Company: ${input.company}`,
+      `Email: ${input.email}`,
+      `Phone: ${input.phone || "Not provided"}`,
+      `Website: ${input.website || "Not provided"}`,
+      `Audit focus: ${displayValue(input.auditFocus)}`,
+      `Budget: ${input.budget ? displayValue(input.budget) : "Not provided"}`,
+      `Timeline: ${displayValue(input.timeline)}`,
       "",
-      `Challenge: ${challenge}`,
+      `Challenge: ${input.challenge}`,
       "",
-      `Goal: ${goal}`,
+      `Goal: ${input.goal}`,
       "",
-      `Audit score: ${report.overallScore}/100`,
+      `Audit score: ${input.report.overallScore}/100`,
       "",
-      report.summary,
+      input.report.summary,
       "",
       "Priority opportunities:",
-      ...report.opportunities.map(
+      ...input.report.opportunities.map(
         (item, index) =>
           `${index + 1}. ${item.title} (${item.impact})\nFinding: ${item.finding}\nRecommendation: ${item.recommendation}`,
       ),
       "",
-      `Recommended next step: ${report.nextStep}`,
+      `Recommended next step: ${input.report.nextStep}`,
     ].join("\n"),
   });
 
-  if (result.error) {
-    console.error("Audit lead email failed:", result.error);
+  if (leadResult.error) {
+    console.error("Audit lead email failed:", leadResult.error);
+  }
+
+  const customerResult = await resend.emails.send({
+    from,
+    to: [input.email],
+    replyTo: contactEmail,
+    subject: `Your AH LLC business audit for ${input.company}`,
+    html: createCustomerEmailHtml(input),
+    text: [
+      `Hi ${input.name},`,
+      "",
+      `Thank you for requesting an AH LLC audit for ${input.company}.`,
+      `Your preliminary growth-readiness score is ${input.report.overallScore}/100.`,
+      "",
+      "Audit summary:",
+      input.report.summary,
+      "",
+      "Three quick wins:",
+      ...input.report.quickWins
+        .slice(0, 3)
+        .map((item, index) => `${index + 1}. ${item}`),
+      "",
+      "Recommended next step:",
+      input.report.nextStep,
+      "",
+      `Book your free 30-minute strategy call: ${CALENDAR_URL}`,
+      "",
+      input.report.disclaimer,
+    ].join("\n"),
+  });
+
+  if (customerResult.error) {
+    console.error(
+      "Customer audit autoresponse failed:",
+      customerResult.error,
+    );
   }
 }
 
@@ -601,6 +676,10 @@ export async function GET() {
         process.env.RESEND_API_KEY &&
           process.env.RESEND_FROM_EMAIL &&
           process.env.CONTACT_TO_EMAIL,
+      ),
+      supabase: Boolean(
+        process.env.NEXT_PUBLIC_SUPABASE_URL &&
+          process.env.SUPABASE_SERVICE_ROLE_KEY,
       ),
     },
   });
@@ -817,7 +896,7 @@ ${
 
     const report = assertAuditReport(parsed);
 
-    await sendLeadEmail({
+    const emailInput: AuditEmailInput = {
       name,
       email,
       phone,
@@ -829,7 +908,9 @@ ${
       budget,
       timeline,
       report,
-    });
+    };
+
+    await sendAuditEmails(emailInput);
 
     if (supabase) {
       const { error: supabaseError } = await supabase
