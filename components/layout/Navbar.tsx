@@ -3,10 +3,7 @@
 import type { Route } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Menu,
-} from "lucide-react";
+import { ArrowRight, Menu } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -62,14 +59,14 @@ export default function Navbar() {
           className="group inline-flex items-center gap-3"
           aria-label="AH LLC home"
         >
-          <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 shadow-sm shadow-black/20">
+          <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-amber-400/20 bg-black shadow-sm shadow-black/30">
             <Image
-              src="/ah-logo-black.png"
-              alt=""
-              width={32}
-              height={32}
+              src="/ah-logo-navbar.png"
+              alt="AH LLC logo"
+              width={44}
+              height={44}
               priority
-              className="h-full w-full object-contain"
+              className="h-full w-full object-cover"
             />
           </span>
 
@@ -100,10 +97,7 @@ export default function Navbar() {
           <Button asChild>
             <Link href="/free-audit">
               Free Audit
-              <ArrowRight
-                className="ml-2 h-4 w-4"
-                aria-hidden="true"
-              />
+              <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
             </Link>
           </Button>
         </nav>
@@ -128,13 +122,13 @@ export default function Navbar() {
               <div className="flex min-h-full flex-col">
                 <SheetHeader className="border-b border-white/10 px-6 py-6 text-left">
                   <SheetTitle className="flex items-center gap-3 text-white">
-                    <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 shadow-sm shadow-black/20">
+                    <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-amber-400/20 bg-black shadow-sm shadow-black/30">
                       <Image
-                        src="/ah-logo-black.png"
-                        alt=""
-                        width={36}
-                        height={36}
-                        className="h-full w-full object-contain"
+                        src="/ah-logo-navbar.png"
+                        alt="AH LLC logo"
+                        width={48}
+                        height={48}
+                        className="h-full w-full object-cover"
                       />
                     </span>
 
@@ -154,10 +148,7 @@ export default function Navbar() {
                   </SheetDescription>
                 </SheetHeader>
 
-                <nav
-                  className="flex-1 px-4 py-5"
-                  aria-label="Mobile navigation"
-                >
+                <nav className="flex-1 px-4 py-5" aria-label="Mobile navigation">
                   <div className="space-y-2">
                     {navigation.map((item) => (
                       <SheetClose asChild key={item.title}>
@@ -186,17 +177,10 @@ export default function Navbar() {
 
                 <div className="border-t border-white/10 bg-zinc-900/40 p-5">
                   <SheetClose asChild>
-                    <Button
-                      asChild
-                      size="lg"
-                      className="w-full rounded-xl"
-                    >
+                    <Button asChild size="lg" className="w-full rounded-xl">
                       <Link href="/free-audit">
                         Get Your Free Business Audit
-                        <ArrowRight
-                          className="ml-2 h-5 w-5"
-                          aria-hidden="true"
-                        />
+                        <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" />
                       </Link>
                     </Button>
                   </SheetClose>
