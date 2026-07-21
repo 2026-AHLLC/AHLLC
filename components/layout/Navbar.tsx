@@ -143,8 +143,7 @@ export default function Navbar() {
                   </SheetTitle>
 
                   <SheetDescription className="pt-3 leading-6 text-zinc-400">
-                    Digital systems built to help your business operate
-                    smarter and grow faster.
+        
                   </SheetDescription>
                 </SheetHeader>
 
