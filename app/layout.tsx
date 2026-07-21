@@ -14,7 +14,7 @@ const inter = Inter({
 });
 
 const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://ahllc.vercel.app/";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://ahllc.mobi";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
