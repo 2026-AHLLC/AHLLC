@@ -26,6 +26,7 @@ const navigation: NavItem[] = [
   {
     title: "Home",
     href: "/",
+    description: "",
   },
   {
     title: "Services",
@@ -184,8 +185,7 @@ export default function Navbar() {
                   </SheetClose>
 
                   <p className="mt-3 text-center text-xs leading-5 text-zinc-500">
-                    No obligation. Get clear recommendations for your
-                    website, marketing, and automation.
+                    Get clear recommendations for your website.
                   </p>
                 </div>
               </div>
