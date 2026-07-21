@@ -31,7 +31,7 @@ const navigation: NavItem[] = [
   {
     title: "Services",
     href: "/services",
-    description: "Explore AI, websites, automation, SEO, and software.",
+    description: "Explore AI, websites, automation, and SEO",
   },
   {
     title: "Portfolio",
@@ -41,7 +41,7 @@ const navigation: NavItem[] = [
   {
     title: "Pricing",
     href: "/pricing",
-    description: "Compare packages and secure checkout options.",
+    description: "Compare plans and secure checkout options.",
   },
   {
     title: "Contact",
