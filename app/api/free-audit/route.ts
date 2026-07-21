@@ -87,7 +87,7 @@ const AUDIT_SCHEMA = {
     strengths: {
       type: "array",
       minItems: 1,
-      maxItems: 4,
+      maxItems: 3,
       items: {
         type: "string",
         minLength: 1,
@@ -96,7 +96,7 @@ const AUDIT_SCHEMA = {
     opportunities: {
       type: "array",
       minItems: 3,
-      maxItems: 5,
+      maxItems: 3,
       items: {
         type: "object",
         additionalProperties: false,
@@ -129,7 +129,7 @@ const AUDIT_SCHEMA = {
     quickWins: {
       type: "array",
       minItems: 3,
-      maxItems: 5,
+      maxItems: 3,
       items: {
         type: "string",
         minLength: 1,
@@ -137,8 +137,8 @@ const AUDIT_SCHEMA = {
     },
     aiAutomationIdeas: {
       type: "array",
-      minItems: 2,
-      maxItems: 5,
+      minItems: 3,
+      maxItems: 3,
       items: {
         type: "string",
         minLength: 1,
@@ -808,6 +808,10 @@ export async function POST(request: Request) {
         process.env.OPENAI_AUDIT_MODEL ??
         "gpt-5-mini",
 
+      reasoning: {
+        effort: "low",
+      },
+
       instructions: `
 You are a senior business-growth, website-conversion, SEO, AI, and automation consultant for AH LLC.
 
@@ -817,10 +821,16 @@ Rules:
 - Never invent analytics, rankings, speed scores, revenue, conversion rates, guarantees, clients, or technical defects.
 - Clearly distinguish direct observations from reasonable inferences.
 - Do not claim that you tested analytics, security, accessibility, rankings, page speed, or backend systems.
-- Keep recommendations specific, concise, and useful.
+- Keep every field concise.
+- Keep the summary under 120 words.
+- Keep each strength under 35 words.
+- Keep each finding under 55 words.
+- Keep each recommendation under 55 words.
+- Keep each quick win under 35 words.
+- Keep each automation idea under 40 words.
+- Keep the recommended next step under 120 words.
 - Treat the score as a preliminary growth-readiness and opportunity score, not a certified technical score.
 - Use plain business language.
-- Keep the entire report concise enough to fit comfortably within the response limit.
       `.trim(),
 
       input: `
@@ -852,18 +862,23 @@ ${
         },
       },
 
-      max_output_tokens: 4_000,
+      max_output_tokens: 8_000,
       store: false,
     });
 
     if (response.status === "incomplete") {
-      console.error(
-        "OpenAI response incomplete:",
-        response.incomplete_details,
-      );
+      console.error("OpenAI audit response incomplete:", {
+        status: response.status,
+        incompleteDetails: response.incomplete_details,
+        responseId: response.id,
+        outputTextLength: response.output_text?.length ?? 0,
+      });
+
+      const reason =
+        response.incomplete_details?.reason ?? "unknown";
 
       throw new Error(
-        "The audit response was interrupted before completion. Please try again.",
+        `The audit response was interrupted before completion (${reason}). Please try again.`,
       );
     }
 
