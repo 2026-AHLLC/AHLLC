@@ -228,18 +228,18 @@ async function createSupportRequest(formData: FormData) {
       message,
       priority,
     });
-  } } catch (emailError) {
-  console.error(
-    "Support request admin notification failed:",
-    emailError instanceof Error
-      ? {
-          name: emailError.name,
-          message: emailError.message,
-          stack: emailError.stack,
-        }
-      : emailError,
-  );
-}
+  } catch (emailError) {
+    console.error(
+      "Support request admin notification failed:",
+      emailError instanceof Error
+        ? {
+            name: emailError.name,
+            message: emailError.message,
+            stack: emailError.stack,
+          }
+        : emailError,
+    );
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/support");
