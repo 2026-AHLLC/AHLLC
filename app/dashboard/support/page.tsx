@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   AlertCircle,
+  ArrowRight,
   CheckCircle2,
-  CircleHelp,
   Clock3,
+  FolderKanban,
   LifeBuoy,
-  MessageCircleMore,
+  MessageSquareText,
   Plus,
   Send,
 } from "lucide-react";
@@ -23,11 +24,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { sendNewSupportRequestEmail } from "@/lib/email/support-notifications";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Support | AH LLC Client Portal",
-  description: "Create and review AH LLC client support requests.",
+  description:
+    "Submit and review support requests through the AH LLC client portal.",
   robots: {
     index: false,
     follow: false,
@@ -36,7 +39,20 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+type SupportPageProps = {
+  searchParams: Promise<{
+    submitted?: string;
+    error?: string;
+  }>;
+};
+
+type Project = {
+  id: string;
+  title: string;
+};
+
 type SupportStatus = "open" | "in_progress" | "resolved" | "closed";
+
 type SupportPriority = "low" | "normal" | "high" | "urgent";
 
 type SupportRequest = {
@@ -51,48 +67,28 @@ type SupportRequest = {
   updated_at: string;
 };
 
-type Project = {
-  id: string;
-  title: string;
+const supportStatusLabels: Record<SupportStatus, string> = {
+  open: "Open",
+  in_progress: "In progress",
+  resolved: "Resolved",
+  closed: "Closed",
 };
 
-type SupportPageProps = {
-  searchParams: Promise<{
-    created?: string;
-    error?: string;
-  }>;
+const supportStatusStyles: Record<SupportStatus, string> = {
+  open: "border-blue-500/30 bg-blue-500/10 text-blue-300",
+  in_progress:
+    "border-amber-500/30 bg-amber-500/10 text-amber-300",
+  resolved:
+    "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+  closed: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
 };
 
-const statusConfig: Record<
-  SupportStatus,
-  {
-    label: string;
-    className: string;
-  }
-> = {
-  open: {
-    label: "Open",
-    className: "border-blue-500/30 bg-blue-500/10 text-blue-300",
-  },
-  in_progress: {
-    label: "In progress",
-    className: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-  },
-  resolved: {
-    label: "Resolved",
-    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-  },
-  closed: {
-    label: "Closed",
-    className: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
-  },
-};
-
-const priorityLabels: Record<SupportPriority, string> = {
-  low: "Low",
-  normal: "Normal",
-  high: "High",
-  urgent: "Urgent",
+const supportPriorityStyles: Record<SupportPriority, string> = {
+  low: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+  normal: "border-blue-500/30 bg-blue-500/10 text-blue-300",
+  high: "border-orange-500/30 bg-orange-500/10 text-orange-300",
+  urgent:
+    "border-destructive/30 bg-destructive/10 text-destructive",
 };
 
 async function createSupportRequest(formData: FormData) {
@@ -126,10 +122,28 @@ async function createSupportRequest(formData: FormData) {
   if (!subject || !message) {
     redirect(
       `/dashboard/support?error=${encodeURIComponent(
-        "Enter a subject and describe how AH LLC can help.",
+        "Enter a subject and message.",
       )}` as Route,
     );
   }
+
+  if (subject.length > 200) {
+    redirect(
+      `/dashboard/support?error=${encodeURIComponent(
+        "The subject must be 200 characters or fewer.",
+      )}` as Route,
+    );
+  }
+
+  if (message.length > 10000) {
+    redirect(
+      `/dashboard/support?error=${encodeURIComponent(
+        "The message must be 10,000 characters or fewer.",
+      )}` as Route,
+    );
+  }
+
+  let validatedProjectId: string | null = null;
 
   if (projectId) {
     const { data: project, error: projectError } = await supabase
@@ -139,40 +153,94 @@ async function createSupportRequest(formData: FormData) {
       .eq("client_id", user.id)
       .maybeSingle();
 
-    if (projectError || !project) {
+    if (projectError) {
+      console.error(
+        "Unable to validate support request project:",
+        projectError,
+      );
+
       redirect(
         `/dashboard/support?error=${encodeURIComponent(
           "The selected project could not be verified.",
         )}` as Route,
       );
     }
+
+    if (!project) {
+      redirect(
+        `/dashboard/support?error=${encodeURIComponent(
+          "The selected project is not available to your account.",
+        )}` as Route,
+      );
+    }
+
+    validatedProjectId = project.id;
   }
 
-  const { error } = await supabase.from("support_requests").insert({
-    client_id: user.id,
-    project_id: projectId || null,
-    subject,
-    message,
-    priority,
-    status: "open",
-    updated_at: new Date().toISOString(),
-  });
+  const { data: supportRequest, error: insertError } = await supabase
+    .from("support_requests")
+    .insert({
+      client_id: user.id,
+      project_id: validatedProjectId,
+      subject,
+      message,
+      priority,
+      status: "open",
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    console.error("Unable to create support request:", error);
+  if (insertError || !supportRequest) {
+    console.error("Unable to create support request:", insertError);
 
     redirect(
       `/dashboard/support?error=${encodeURIComponent(
-        "Your support request could not be submitted. Please try again.",
+        "Your support request could not be submitted.",
       )}` as Route,
     );
   }
 
-  revalidatePath("/dashboard/support");
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("full_name, company_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error(
+      "Unable to load profile for support notification:",
+      profileError,
+    );
+  }
+
+  const clientName =
+    profile?.company_name?.trim() ||
+    profile?.full_name?.trim() ||
+    user.email?.split("@")[0] ||
+    "AH LLC Client";
+
+  try {
+    await sendNewSupportRequestEmail({
+      requestId: supportRequest.id,
+      clientName,
+      clientEmail: user.email ?? null,
+      subject,
+      message,
+      priority,
+    });
+  } catch (emailError) {
+    console.error(
+      "Support request was created, but the admin email notification failed:",
+      emailError,
+    );
+  }
+
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/support");
+  revalidatePath("/admin");
   revalidatePath("/admin/support");
 
-  redirect("/dashboard/support?created=1");
+  redirect("/dashboard/support?submitted=1");
 }
 
 export default async function DashboardSupportPage({
@@ -187,12 +255,16 @@ export default async function DashboardSupportPage({
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    return (
-      <SupportErrorState message="We could not verify your client account." />
-    );
+    redirect("/login?redirectTo=/dashboard/support");
   }
 
-  const [requestsResult, projectsResult] = await Promise.all([
+  const [projectsResult, supportResult] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("id, title")
+      .eq("client_id", user.id)
+      .order("updated_at", { ascending: false }),
+
     supabase
       .from("support_requests")
       .select(
@@ -209,72 +281,75 @@ export default async function DashboardSupportPage({
         `,
       )
       .eq("client_id", user.id)
-      .order("created_at", { ascending: false }),
-
-    supabase
-      .from("projects")
-      .select("id, title")
-      .eq("client_id", user.id)
-      .order("title", { ascending: true }),
+      .order("updated_at", { ascending: false }),
   ]);
-
-  if (requestsResult.error) {
-    console.error(
-      "Unable to load client support requests:",
-      requestsResult.error,
-    );
-
-    return (
-      <SupportErrorState message="We could not load your support requests." />
-    );
-  }
 
   if (projectsResult.error) {
     console.error(
-      "Unable to load projects for support request:",
+      "Unable to load support form projects:",
       projectsResult.error,
     );
   }
 
-  const requests = (requestsResult.data ?? []) as SupportRequest[];
+  if (supportResult.error) {
+    console.error(
+      "Unable to load client support requests:",
+      supportResult.error,
+    );
+  }
+
   const projects = projectsResult.error
     ? []
     : ((projectsResult.data ?? []) as Project[]);
+
+  const supportRequests = supportResult.error
+    ? []
+    : ((supportResult.data ?? []) as SupportRequest[]);
 
   const projectMap = new Map(
     projects.map((project) => [project.id, project.title]),
   );
 
-  const openCount = requests.filter(
-    (request) => request.status === "open",
+  const openRequests = supportRequests.filter((request) =>
+    ["open", "in_progress"].includes(request.status),
   ).length;
 
-  const inProgressCount = requests.filter(
-    (request) => request.status === "in_progress",
+  const resolvedRequests = supportRequests.filter(
+    (request) => request.status === "resolved",
   ).length;
 
-  const resolvedCount = requests.filter(
+  const urgentRequests = supportRequests.filter(
     (request) =>
-      request.status === "resolved" || request.status === "closed",
+      request.priority === "urgent" &&
+      ["open", "in_progress"].includes(request.status),
   ).length;
 
   return (
     <div className="space-y-8">
-      <section>
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
-          <LifeBuoy aria-hidden="true" className="size-3.5" />
-          Client support
+      <section className="relative overflow-hidden rounded-2xl border border-border/70 bg-background p-6 shadow-sm sm:p-8">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.12),transparent_42%)]"
+        />
+
+        <div className="relative max-w-3xl">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+            <LifeBuoy aria-hidden="true" className="size-3.5" />
+            AH LLC Client Support
+          </div>
+
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Support
+          </h1>
+
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+            Submit a request, track its status, and review responses from
+            AH LLC.
+          </p>
         </div>
-
-        <h1 className="text-3xl font-bold tracking-tight">Support</h1>
-
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Submit project questions, report technical issues, and review
-          responses from AH LLC.
-        </p>
       </section>
 
-      {query.created === "1" ? (
+      {query.submitted === "1" ? (
         <div
           role="status"
           className="flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"
@@ -284,7 +359,10 @@ export default async function DashboardSupportPage({
             className="mt-0.5 size-4 shrink-0"
           />
 
-          <span>Your support request was submitted successfully.</span>
+          <span>
+            Your support request was submitted successfully. AH LLC has
+            been notified.
+          </span>
         </div>
       ) : null}
 
@@ -302,41 +380,59 @@ export default async function DashboardSupportPage({
         </div>
       ) : null}
 
+      {supportResult.error ? (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+        >
+          <AlertCircle
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0"
+          />
+
+          <span>
+            Your existing support requests could not be loaded. You may
+            still submit a new request below.
+          </span>
+        </div>
+      ) : null}
+
       <section
-        aria-label="Support summary"
+        aria-label="Support request summary"
         className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <SummaryCard
           title="All requests"
-          value={requests.length}
-          description="Total support requests"
-          icon={MessageCircleMore}
+          value={supportRequests.length}
+          description="Requests submitted"
+          icon={MessageSquareText}
         />
 
         <SummaryCard
-          title="Open"
-          value={openCount}
-          description="Awaiting review"
-          icon={CircleHelp}
-        />
-
-        <SummaryCard
-          title="In progress"
-          value={inProgressCount}
-          description="Currently being handled"
+          title="Open requests"
+          value={openRequests}
+          description="Currently active"
           icon={Clock3}
         />
 
         <SummaryCard
           title="Resolved"
-          value={resolvedCount}
-          description="Completed requests"
+          value={resolvedRequests}
+          description="Requests completed"
           icon={CheckCircle2}
+        />
+
+        <SummaryCard
+          title="Urgent"
+          value={urgentRequests}
+          description="Urgent active requests"
+          icon={AlertCircle}
+          emphasize={urgentRequests > 0}
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <Card className="border-border/70">
+      <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+        <Card className="h-fit border-border/70">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus aria-hidden="true" className="size-5" />
@@ -344,7 +440,8 @@ export default async function DashboardSupportPage({
             </CardTitle>
 
             <CardDescription>
-              Provide enough detail for AH LLC to review and respond.
+              Describe the issue or request and AH LLC will respond
+              through your client portal.
             </CardDescription>
           </CardHeader>
 
@@ -356,8 +453,8 @@ export default async function DashboardSupportPage({
                 <Input
                   id="subject"
                   name="subject"
-                  placeholder="Example: Website form is not submitting"
-                  maxLength={160}
+                  placeholder="Briefly describe your request"
+                  maxLength={200}
                   required
                 />
               </div>
@@ -371,7 +468,7 @@ export default async function DashboardSupportPage({
                   defaultValue=""
                   className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
-                  <option value="">General support request</option>
+                  <option value="">General support</option>
 
                   {projects.map((project) => (
                     <option key={project.id} value={project.id}>
@@ -379,6 +476,11 @@ export default async function DashboardSupportPage({
                     </option>
                   ))}
                 </select>
+
+                <p className="text-xs text-muted-foreground">
+                  Select a project only when the request relates to
+                  specific work.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -395,6 +497,11 @@ export default async function DashboardSupportPage({
                   <option value="high">High</option>
                   <option value="urgent">Urgent</option>
                 </select>
+
+                <p className="text-xs text-muted-foreground">
+                  Use urgent only for time-sensitive issues that
+                  materially affect active work.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -403,10 +510,11 @@ export default async function DashboardSupportPage({
                 <textarea
                   id="message"
                   name="message"
-                  rows={7}
-                  placeholder="Describe the issue, question, or requested assistance."
-                  className="flex min-h-36 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  rows={8}
+                  maxLength={10000}
                   required
+                  placeholder="Include the relevant details, expected result, and any error message you received."
+                  className="flex min-h-40 w-full resize-y rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 />
               </div>
 
@@ -418,23 +526,44 @@ export default async function DashboardSupportPage({
           </CardContent>
         </Card>
 
-        <div>
+        <section aria-labelledby="support-history-heading">
           <div className="mb-4">
-            <h2 className="text-xl font-semibold tracking-tight">
-              Your requests
+            <h2
+              id="support-history-heading"
+              className="text-xl font-semibold tracking-tight"
+            >
+              Support history
             </h2>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              Review request status and responses from AH LLC.
+              Review the status and latest response for each request.
             </p>
           </div>
 
-          {requests.length === 0 ? (
+          {supportResult.error ? (
+            <Card className="border-destructive/30">
+              <CardContent className="flex min-h-64 flex-col items-center justify-center px-6 py-12 text-center">
+                <AlertCircle
+                  aria-hidden="true"
+                  className="size-8 text-destructive"
+                />
+
+                <h3 className="mt-4 text-lg font-semibold">
+                  Support history unavailable
+                </h3>
+
+                <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+                  Your previous requests could not be loaded. Refresh the
+                  page or try again later.
+                </p>
+              </CardContent>
+            </Card>
+          ) : supportRequests.length === 0 ? (
             <EmptySupportState />
           ) : (
             <div className="space-y-4">
-              {requests.map((request) => (
-                <ClientSupportCard
+              {supportRequests.map((request) => (
+                <SupportRequestCard
                   key={request.id}
                   request={request}
                   projectTitle={
@@ -446,85 +575,115 @@ export default async function DashboardSupportPage({
               ))}
             </div>
           )}
-        </div>
+        </section>
       </section>
     </div>
   );
 }
 
-function ClientSupportCard({
+function SupportRequestCard({
   request,
   projectTitle,
 }: {
   request: SupportRequest;
   projectTitle: string | null;
 }) {
-  const status = statusConfig[request.status] ?? statusConfig.open;
-
   return (
     <Card className="border-border/70">
-      <CardHeader className="space-y-4">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+      <CardHeader>
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div className="min-w-0">
-            <CardTitle className="text-base">{request.subject}</CardTitle>
+            <CardTitle className="text-base">
+              {request.subject}
+            </CardTitle>
 
             <CardDescription className="mt-2">
               Submitted {formatDateTime(request.created_at)}
+              {projectTitle ? ` · ${projectTitle}` : " · General support"}
             </CardDescription>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             <span
-              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${status.className}`}
+              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
+                supportPriorityStyles[request.priority]
+              }`}
             >
-              {status.label}
+              {capitalize(request.priority)}
             </span>
 
-            <span className="inline-flex rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs font-medium">
-              {priorityLabels[request.priority]} priority
+            <span
+              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
+                supportStatusStyles[request.status]
+              }`}
+            >
+              {supportStatusLabels[request.status]}
             </span>
           </div>
         </div>
-
-        {projectTitle ? (
-          <p className="text-xs font-medium text-muted-foreground">
-            Project: {projectTitle}
-          </p>
-        ) : null}
       </CardHeader>
 
       <CardContent className="space-y-5">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Your message
           </p>
 
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">
             {request.message}
           </p>
         </div>
 
         {request.admin_response ? (
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-primary">
-              AH LLC response
-            </p>
+            <div className="mb-3 flex items-center gap-2">
+              <LifeBuoy
+                aria-hidden="true"
+                className="size-4 text-primary"
+              />
 
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+              <p className="text-sm font-semibold">
+                Response from AH LLC
+              </p>
+            </div>
+
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
               {request.admin_response}
-            </p>
-
-            <p className="mt-3 text-xs text-muted-foreground">
-              Updated {formatDateTime(request.updated_at)}
             </p>
           </div>
         ) : (
           <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-            <p className="text-sm text-muted-foreground">
-              AH LLC has not added a response yet.
-            </p>
+            <div className="flex items-start gap-3">
+              <Clock3
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+              />
+
+              <p className="text-sm text-muted-foreground">
+                AH LLC has received this request. A response will appear
+                here when available.
+              </p>
+            </div>
           </div>
         )}
+
+        <div className="flex flex-col justify-between gap-3 border-t border-border/70 pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center">
+          <span>
+            Last updated {formatDateTime(request.updated_at)}
+          </span>
+
+          {request.project_id ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link href={"/dashboard/projects" as Route}>
+                View projects
+                <ArrowRight
+                  aria-hidden="true"
+                  className="ml-2 size-4"
+                />
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );
@@ -535,25 +694,43 @@ function SummaryCard({
   value,
   description,
   icon: Icon,
+  emphasize = false,
 }: {
   title: string;
   value: number;
   description: string;
   icon: typeof LifeBuoy;
+  emphasize?: boolean;
 }) {
   return (
-    <Card className="border-border/70">
+    <Card
+      className={
+        emphasize
+          ? "border-destructive/40 bg-destructive/5"
+          : "border-border/70"
+      }
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
 
-        <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
+        <Icon
+          aria-hidden="true"
+          className={
+            emphasize
+              ? "size-4 text-destructive"
+              : "size-4 text-muted-foreground"
+          }
+        />
       </CardHeader>
 
       <CardContent>
         <p className="text-3xl font-bold tracking-tight">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          {description}
+        </p>
       </CardContent>
     </Card>
   );
@@ -563,51 +740,23 @@ function EmptySupportState() {
   return (
     <Card className="border-border/70">
       <CardContent className="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center">
-        <LifeBuoy
-          aria-hidden="true"
-          className="size-9 text-muted-foreground"
-        />
+        <div className="flex size-14 items-center justify-center rounded-full border border-border bg-muted/50">
+          <LifeBuoy
+            aria-hidden="true"
+            className="size-6 text-muted-foreground"
+          />
+        </div>
 
-        <h3 className="mt-4 text-lg font-semibold">
+        <h3 className="mt-5 text-lg font-semibold">
           No support requests
         </h3>
 
         <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-          Your submitted questions and AH LLC responses will appear here.
+          Submit your first request using the form. New requests and
+          responses from AH LLC will appear here.
         </p>
       </CardContent>
     </Card>
-  );
-}
-
-function SupportErrorState({ message }: { message: string }) {
-  return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight">Support</h1>
-
-      <Card className="border-destructive/30">
-        <CardContent className="flex min-h-64 flex-col items-center justify-center px-6 py-12 text-center">
-          <AlertCircle
-            aria-hidden="true"
-            className="size-8 text-destructive"
-          />
-
-          <h2 className="mt-4 text-lg font-semibold">
-            Support unavailable
-          </h2>
-
-          <p className="mt-2 max-w-md text-sm text-muted-foreground">
-            {message}
-          </p>
-
-          <Button asChild variant="outline" className="mt-6">
-            <Link href={"/dashboard" as Route}>
-              Return to dashboard
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
   );
 }
 
@@ -617,11 +766,15 @@ function getString(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function formatDateTime(value: string) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Unknown date";
+    return "Unknown";
   }
 
   return new Intl.DateTimeFormat("en-US", {
