@@ -1,7 +1,8 @@
 "use server";
 
-import { headers } from "next/headers";
+import type { Route } from "next";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -11,10 +12,10 @@ export type AuthActionState = {
   message: string;
 };
 
-const DEFAULT_LOGIN_REDIRECT = "/dashboard";
+const DEFAULT_LOGIN_REDIRECT: Route = "/dashboard";
 const MINIMUM_PASSWORD_LENGTH = 8;
 
-function getFormValue(formData: FormData, key: string) {
+function getFormValue(formData: FormData, key: string): string {
   const value = formData.get(key);
 
   return typeof value === "string" ? value.trim() : "";
@@ -22,17 +23,17 @@ function getFormValue(formData: FormData, key: string) {
 
 function getSafeRedirectPath(
   value: string,
-  fallback = DEFAULT_LOGIN_REDIRECT,
-) {
+  fallback: Route = DEFAULT_LOGIN_REDIRECT,
+): Route {
   if (!value.startsWith("/") || value.startsWith("//")) {
     return fallback;
   }
 
-  return value;
+  return value as Route;
 }
 
 /**
- * Signs an existing user into AH LLC using email and password.
+ * Signs an existing user in with an email address and password.
  */
 export async function login(
   _previousState: AuthActionState,
@@ -50,22 +51,32 @@ export async function login(
     };
   }
 
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  if (error) {
-    console.error("Supabase login error:", error.message);
+    if (error) {
+      console.error("Supabase login error:", error.message);
+
+      return {
+        success: false,
+        message:
+          error.message === "Invalid login credentials"
+            ? "The email address or password is incorrect."
+            : "We could not sign you in. Please try again.",
+      };
+    }
+  } catch (error) {
+    console.error("Login action error:", error);
 
     return {
       success: false,
       message:
-        error.message === "Invalid login credentials"
-          ? "The email address or password is incorrect."
-          : "We could not sign you in. Please try again.",
+        "We could not connect to the authentication service. Please try again.",
     };
   }
 
@@ -76,19 +87,17 @@ export async function login(
 /**
  * Signs the current user out and returns them to the login page.
  */
-export async function logout() {
-  const supabase = await createClient();
+export async function logout(): Promise<never> {
+  try {
+    const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (user) {
     const { error } = await supabase.auth.signOut();
 
     if (error) {
       console.error("Supabase logout error:", error.message);
     }
+  } catch (error) {
+    console.error("Logout action error:", error);
   }
 
   revalidatePath("/", "layout");
@@ -111,22 +120,51 @@ export async function requestPasswordReset(
     };
   }
 
-  const requestHeaders = await headers();
-  const origin = requestHeaders.get("origin");
+  try {
+    const requestHeaders = await headers();
 
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-    origin ||
-    "http://localhost:3000";
+    const origin =
+      requestHeaders.get("origin") ??
+      requestHeaders.get("x-forwarded-host") ??
+      requestHeaders.get("host");
 
-  const supabase = await createClient();
+    let siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
-  });
+    if (!siteUrl && origin) {
+      const protocol =
+        requestHeaders.get("x-forwarded-proto") ??
+        (origin.includes("localhost") ? "http" : "https");
 
-  if (error) {
-    console.error("Supabase password-reset error:", error.message);
+      siteUrl = origin.startsWith("http")
+        ? origin.replace(/\/$/, "")
+        : `${protocol}://${origin}`.replace(/\/$/, "");
+    }
+
+    siteUrl ??= "http://localhost:3000";
+
+    const supabase = await createClient();
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+    });
+
+    if (error) {
+      console.error("Supabase password-reset error:", error.message);
+
+      return {
+        success: false,
+        message:
+          "We could not send the password reset email. Please try again.",
+      };
+    }
+
+    return {
+      success: true,
+      message:
+        "If an account exists for that email address, a password reset link has been sent.",
+    };
+  } catch (error) {
+    console.error("Password-reset action error:", error);
 
     return {
       success: false,
@@ -134,16 +172,6 @@ export async function requestPasswordReset(
         "We could not send the password reset email. Please try again.",
     };
   }
-
-  /*
-   * Keep this response generic so the application does not reveal
-   * whether a particular email address is registered.
-   */
-  return {
-    success: true,
-    message:
-      "If an account exists for that email address, a password reset link has been sent.",
-  };
 }
 
 /**
@@ -170,27 +198,49 @@ export async function updatePassword(
     };
   }
 
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-  if (userError || !user) {
-    return {
-      success: false,
-      message:
-        "Your password reset session is invalid or has expired. Request a new reset link.",
-    };
-  }
+    if (userError || !user) {
+      return {
+        success: false,
+        message:
+          "Your password reset session is invalid or has expired. Request a new reset link.",
+      };
+    }
 
-  const { error } = await supabase.auth.updateUser({
-    password,
-  });
+    const { error: updateError } = await supabase.auth.updateUser({
+      password,
+    });
 
-  if (error) {
-    console.error("Supabase password-update error:", error.message);
+    if (updateError) {
+      console.error(
+        "Supabase password-update error:",
+        updateError.message,
+      );
+
+      return {
+        success: false,
+        message:
+          "We could not update your password. Please request a new reset link and try again.",
+      };
+    }
+
+    const { error: signOutError } = await supabase.auth.signOut();
+
+    if (signOutError) {
+      console.error(
+        "Supabase recovery-session sign-out error:",
+        signOutError.message,
+      );
+    }
+  } catch (error) {
+    console.error("Password-update action error:", error);
 
     return {
       success: false,
@@ -198,12 +248,6 @@ export async function updatePassword(
         "We could not update your password. Please request a new reset link and try again.",
     };
   }
-
-  /*
-   * Close the temporary recovery session. The user will sign in again
-   * with the newly created password.
-   */
-  await supabase.auth.signOut();
 
   revalidatePath("/", "layout");
 
