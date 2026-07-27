@@ -7,6 +7,7 @@ import {
   FolderKanban,
   Gauge,
   Home,
+  LifeBuoy,
   LogOut,
   ShieldCheck,
   Users,
@@ -42,6 +43,11 @@ const navigation = [
     title: "Documents",
     href: "/admin/documents",
     icon: FileText,
+  },
+  {
+    title: "Support",
+    href: "/admin/support",
+    icon: LifeBuoy,
   },
 ] as const;
 
@@ -85,8 +91,7 @@ export default async function AdminLayout({
     user.email?.split("@")[0] ||
     "Administrator";
 
-  const organizationName =
-    profile.company_name?.trim() || "AH LLC";
+  const organizationName = profile.company_name?.trim() || "AH LLC";
 
   const initials = getInitials(displayName, user.email);
 
@@ -118,7 +123,7 @@ export default async function AdminLayout({
             <div className="hidden h-6 w-px bg-border lg:block" />
 
             <p className="hidden truncate text-sm text-muted-foreground lg:block">
-              Manage clients, projects, documents, and portal activity
+              Manage clients, projects, documents, support, and portal activity
             </p>
           </div>
 
@@ -202,8 +207,8 @@ export default async function AdminLayout({
                 </div>
 
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  Changes made here can affect projects, files, and information
-                  shown in client portals.
+                  Changes made here can affect projects, files, support
+                  requests, and information shown in client portals.
                 </p>
 
                 <Button
@@ -271,3 +276,6 @@ function getInitials(name: string, email?: string) {
       .map((part) => part.charAt(0).toUpperCase())
       .join("");
   }
+
+  return email?.charAt(0).toUpperCase() ?? "A";
+}
