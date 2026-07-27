@@ -3,6 +3,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  FileText,
   FolderKanban,
   Gauge,
   Home,
@@ -37,6 +38,11 @@ const navigation = [
     href: "/admin/clients",
     icon: Users,
   },
+  {
+    title: "Documents",
+    href: "/admin/documents",
+    icon: FileText,
+  },
 ] as const;
 
 export default async function AdminLayout({
@@ -60,7 +66,7 @@ export default async function AdminLayout({
     .maybeSingle();
 
   if (profileError) {
-    console.error("Unable to load admin profile:", profileError);
+    console.error("Unable to load administrator profile:", profileError);
     redirect("/dashboard");
   }
 
@@ -68,11 +74,19 @@ export default async function AdminLayout({
     redirect("/dashboard");
   }
 
+  const metadataFullName =
+    typeof user.user_metadata?.full_name === "string"
+      ? user.user_metadata.full_name.trim()
+      : "";
+
   const displayName =
     profile.full_name?.trim() ||
-    user.user_metadata?.full_name?.trim() ||
+    metadataFullName ||
     user.email?.split("@")[0] ||
     "Administrator";
+
+  const organizationName =
+    profile.company_name?.trim() || "AH LLC";
 
   const initials = getInitials(displayName, user.email);
 
@@ -83,15 +97,18 @@ export default async function AdminLayout({
           <div className="flex min-w-0 items-center gap-5">
             <Link
               href={"/admin" as Route}
-              className="inline-flex items-center gap-3"
-              aria-label="AH LLC administration"
+              className="inline-flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label="AH LLC administration dashboard"
             >
-              <div className="flex size-10 items-center justify-center rounded-xl bg-foreground text-background">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-foreground text-background shadow-sm">
                 <ShieldCheck aria-hidden="true" className="size-5" />
               </div>
 
-              <div className="hidden sm:block">
-                <p className="font-bold leading-none tracking-tight">AH LLC</p>
+              <div className="hidden min-w-0 sm:block">
+                <p className="truncate font-bold leading-none tracking-tight">
+                  {organizationName}
+                </p>
+
                 <p className="mt-1 text-xs text-muted-foreground">
                   Administration
                 </p>
@@ -101,12 +118,17 @@ export default async function AdminLayout({
             <div className="hidden h-6 w-px bg-border lg:block" />
 
             <p className="hidden truncate text-sm text-muted-foreground lg:block">
-              Manage clients, projects, documents, and support
+              Manage clients, projects, documents, and portal activity
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" size="sm" className="hidden sm:flex">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="hidden md:inline-flex"
+            >
               <Link href={"/dashboard" as Route}>
                 <Home aria-hidden="true" className="mr-2 size-4" />
                 Client dashboard
@@ -115,6 +137,7 @@ export default async function AdminLayout({
 
             <div className="hidden max-w-56 text-right sm:block">
               <p className="truncate text-sm font-medium">{displayName}</p>
+
               <p className="truncate text-xs text-muted-foreground">
                 {user.email}
               </p>
@@ -122,7 +145,7 @@ export default async function AdminLayout({
 
             <div
               aria-hidden="true"
-              className="flex size-9 items-center justify-center rounded-full border border-border bg-muted text-xs font-semibold"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-xs font-semibold"
             >
               {initials}
             </div>
@@ -156,9 +179,9 @@ export default async function AdminLayout({
                   <Link
                     key={item.href}
                     href={item.href as Route}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Icon aria-hidden="true" className="size-4" />
+                    <Icon aria-hidden="true" className="size-4 shrink-0" />
                     {item.title}
                   </Link>
                 );
@@ -167,12 +190,33 @@ export default async function AdminLayout({
 
             <div className="border-t border-border/70 p-4">
               <div className="rounded-xl border border-border/70 bg-muted/40 p-4">
-                <p className="text-sm font-semibold">Administrator access</p>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck
+                    aria-hidden="true"
+                    className="size-4 text-muted-foreground"
+                  />
 
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  Changes made here can affect what AH LLC clients see in their
-                  portals.
+                  <p className="text-sm font-semibold">
+                    Administrator access
+                  </p>
+                </div>
+
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Changes made here can affect projects, files, and information
+                  shown in client portals.
                 </p>
+
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 w-full"
+                >
+                  <Link href={"/dashboard" as Route}>
+                    <Home aria-hidden="true" className="mr-2 size-4" />
+                    View client portal
+                  </Link>
+                </Button>
               </div>
             </div>
           </div>
@@ -191,9 +235,9 @@ export default async function AdminLayout({
                   <Link
                     key={item.href}
                     href={item.href as Route}
-                    className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Icon aria-hidden="true" className="size-4" />
+                    <Icon aria-hidden="true" className="size-4 shrink-0" />
                     {item.title}
                   </Link>
                 );
@@ -201,10 +245,10 @@ export default async function AdminLayout({
 
               <Link
                 href={"/dashboard" as Route}
-                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <Home aria-hidden="true" className="size-4" />
-                Dashboard
+                <Home aria-hidden="true" className="size-4 shrink-0" />
+                Client portal
               </Link>
             </div>
           </nav>
@@ -217,14 +261,13 @@ export default async function AdminLayout({
 }
 
 function getInitials(name: string, email?: string) {
-  if (name.trim()) {
-    return name
+  const normalizedName = name.trim();
+
+  if (normalizedName) {
+    return normalizedName
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part.charAt(0).toUpperCase())
       .join("");
   }
-
-  return email?.charAt(0).toUpperCase() ?? "A";
-}
