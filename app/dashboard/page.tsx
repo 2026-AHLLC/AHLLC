@@ -56,6 +56,24 @@ type Project = {
   updated_at: string;
 };
 
+type SupportStatus = "open" | "in_progress" | "resolved" | "closed";
+
+type SupportRequest = {
+  id: string;
+  subject: string;
+  status: SupportStatus;
+  priority: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ClientDocument = {
+  id: string;
+  title: string;
+  category: string;
+  created_at: string;
+};
+
 const quickActions = [
   {
     title: "View projects",
@@ -77,7 +95,7 @@ const quickActions = [
   },
   {
     title: "Request support",
-    description: "Send a question or request assistance with your project.",
+    description: "Submit a question or request assistance with your project.",
     href: "/dashboard/support",
     icon: LifeBuoy,
   },
@@ -94,32 +112,38 @@ const statusConfig: Record<
   planned: {
     label: "Planned",
     icon: CircleDashed,
-    className: "border-slate-500/30 bg-slate-500/10 text-slate-300",
+    className:
+      "border-slate-500/30 bg-slate-500/10 text-slate-300",
   },
   in_progress: {
     label: "In progress",
     icon: Clock3,
-    className: "border-blue-500/30 bg-blue-500/10 text-blue-300",
+    className:
+      "border-blue-500/30 bg-blue-500/10 text-blue-300",
   },
   waiting_on_client: {
     label: "Waiting on you",
     icon: AlertCircle,
-    className: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+    className:
+      "border-amber-500/30 bg-amber-500/10 text-amber-300",
   },
   review: {
     label: "In review",
     icon: CircleDashed,
-    className: "border-violet-500/30 bg-violet-500/10 text-violet-300",
+    className:
+      "border-violet-500/30 bg-violet-500/10 text-violet-300",
   },
   completed: {
     label: "Completed",
     icon: CheckCircle2,
-    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+    className:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
   },
   paused: {
     label: "Paused",
     icon: PauseCircle,
-    className: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+    className:
+      "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
   },
 };
 
@@ -135,29 +159,80 @@ export default async function DashboardPage() {
     return <DashboardErrorState />;
   }
 
-  const { data, error: projectsError } = await supabase
-    .from("projects")
-    .select(
-      `
-        id,
-        title,
-        description,
-        status,
-        progress,
-        start_date,
-        due_date,
-        created_at,
-        updated_at
-      `,
-    )
-    .eq("client_id", user.id)
-    .order("updated_at", { ascending: false });
+  const [projectsResult, documentsResult, supportResult] =
+    await Promise.all([
+      supabase
+        .from("projects")
+        .select(
+          `
+            id,
+            title,
+            description,
+            status,
+            progress,
+            start_date,
+            due_date,
+            created_at,
+            updated_at
+          `,
+        )
+        .eq("client_id", user.id)
+        .order("updated_at", { ascending: false }),
 
-  if (projectsError) {
-    console.error("Unable to load dashboard projects:", projectsError);
+      supabase
+        .from("client_documents")
+        .select("id, title, category, created_at")
+        .eq("client_id", user.id)
+        .order("created_at", { ascending: false }),
+
+      supabase
+        .from("support_requests")
+        .select(
+          `
+            id,
+            subject,
+            status,
+            priority,
+            created_at,
+            updated_at
+          `,
+        )
+        .eq("client_id", user.id)
+        .order("updated_at", { ascending: false }),
+    ]);
+
+  if (projectsResult.error) {
+    console.error(
+      "Unable to load dashboard projects:",
+      projectsResult.error,
+    );
   }
 
-  const projects = projectsError ? [] : ((data ?? []) as Project[]);
+  if (documentsResult.error) {
+    console.error(
+      "Unable to load dashboard documents:",
+      documentsResult.error,
+    );
+  }
+
+  if (supportResult.error) {
+    console.error(
+      "Unable to load dashboard support requests:",
+      supportResult.error,
+    );
+  }
+
+  const projects = projectsResult.error
+    ? []
+    : ((projectsResult.data ?? []) as Project[]);
+
+  const documents = documentsResult.error
+    ? []
+    : ((documentsResult.data ?? []) as ClientDocument[]);
+
+  const supportRequests = supportResult.error
+    ? []
+    : ((supportResult.data ?? []) as SupportRequest[]);
 
   const displayName =
     typeof user.user_metadata?.full_name === "string" &&
@@ -172,16 +247,24 @@ export default async function DashboardPage() {
     ["planned", "in_progress", "review"].includes(project.status),
   ).length;
 
-  const waitingOnClient = projects.filter(
-    (project) => project.status === "waiting_on_client",
-  ).length;
-
   const completedProjects = projects.filter(
     (project) => project.status === "completed",
   ).length;
 
-  const totalProjects = projects.length;
+  const waitingOnClient = projects.filter(
+    (project) => project.status === "waiting_on_client",
+  ).length;
+
+  const openSupportRequests = supportRequests.filter((request) =>
+    ["open", "in_progress"].includes(request.status),
+  ).length;
+
   const recentProjects = projects.slice(0, 3);
+
+  const hasDataError =
+    Boolean(projectsResult.error) ||
+    Boolean(documentsResult.error) ||
+    Boolean(supportResult.error);
 
   return (
     <div className="space-y-8">
@@ -209,6 +292,23 @@ export default async function DashboardPage() {
         </div>
       </section>
 
+      {hasDataError ? (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+        >
+          <AlertCircle
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0"
+          />
+
+          <p>
+            Some dashboard information could not be loaded. The available
+            sections are still shown below.
+          </p>
+        </div>
+      ) : null}
+
       <section aria-labelledby="account-overview">
         <div className="mb-4">
           <h2
@@ -219,37 +319,45 @@ export default async function DashboardPage() {
           </h2>
 
           <p className="mt-1 text-sm text-muted-foreground">
-            A live summary of your current AH LLC activity.
+            A live summary of your AH LLC portal activity.
           </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <OverviewCard
             title="Active projects"
-            value={activeProjects.toString()}
-            description="Projects currently underway"
+            value={activeProjects}
+            description={
+              waitingOnClient > 0
+                ? `${waitingOnClient} waiting on your input`
+                : "Projects currently underway"
+            }
             icon={FolderKanban}
+            href="/dashboard/projects"
           />
 
           <OverviewCard
-            title="Waiting on you"
-            value={waitingOnClient.toString()}
-            description="Projects requiring your input"
-            icon={AlertCircle}
+            title="Available documents"
+            value={documents.length}
+            description="Reports, files, and deliverables"
+            icon={FileText}
+            href="/dashboard/documents"
           />
 
           <OverviewCard
-            title="Completed"
-            value={completedProjects.toString()}
+            title="Open support requests"
+            value={openSupportRequests}
+            description="Requests awaiting resolution"
+            icon={LifeBuoy}
+            href="/dashboard/support"
+          />
+
+          <OverviewCard
+            title="Completed projects"
+            value={completedProjects}
             description="Projects completed by AH LLC"
             icon={CheckCircle2}
-          />
-
-          <OverviewCard
-            title="Total projects"
-            value={totalProjects.toString()}
-            description="All projects assigned to you"
-            icon={CircleDashed}
+            href="/dashboard/projects"
           />
         </div>
       </section>
@@ -334,7 +442,7 @@ export default async function DashboardPage() {
           ) : null}
         </div>
 
-        {projectsError ? (
+        {projectsResult.error ? (
           <Card className="border-destructive/30">
             <CardContent className="flex min-h-52 flex-col items-center justify-center px-6 py-10 text-center">
               <AlertCircle
@@ -342,11 +450,13 @@ export default async function DashboardPage() {
                 className="size-7 text-destructive"
               />
 
-              <h3 className="mt-4 font-semibold">Projects unavailable</h3>
+              <h3 className="mt-4 font-semibold">
+                Projects unavailable
+              </h3>
 
               <p className="mt-2 max-w-md text-sm text-muted-foreground">
-                We could not load your projects. Please refresh the page or try
-                again later.
+                We could not load your projects. Please refresh the page or
+                try again later.
               </p>
             </CardContent>
           </Card>
@@ -360,15 +470,163 @@ export default async function DashboardPage() {
           </div>
         )}
       </section>
+
+      <section aria-labelledby="portal-summary">
+        <div className="mb-4">
+          <h2
+            id="portal-summary"
+            className="text-xl font-semibold tracking-tight"
+          >
+            Portal summary
+          </h2>
+
+          <p className="mt-1 text-sm text-muted-foreground">
+            Quick access to your latest documents and support activity.
+          </p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="border-border/70">
+            <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="text-base">
+                  Latest documents
+                </CardTitle>
+
+                <CardDescription className="mt-2">
+                  Recently shared files available to your account.
+                </CardDescription>
+              </div>
+
+              <FileText
+                aria-hidden="true"
+                className="size-5 text-muted-foreground"
+              />
+            </CardHeader>
+
+            <CardContent>
+              {documents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No documents have been shared yet.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {documents.slice(0, 3).map((document) => (
+                    <div
+                      key={document.id}
+                      className="flex items-center justify-between gap-4 border-b border-border/70 pb-3 last:border-0 last:pb-0"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {document.title}
+                        </p>
+
+                        <p className="mt-1 text-xs capitalize text-muted-foreground">
+                          {document.category.replaceAll("_", " ")}
+                        </p>
+                      </div>
+
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {formatDate(document.created_at)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="mt-5 w-full"
+              >
+                <Link href={"/dashboard/documents" as Route}>
+                  View documents
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="ml-2 size-4"
+                  />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/70">
+            <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+              <div>
+                <CardTitle className="text-base">
+                  Support activity
+                </CardTitle>
+
+                <CardDescription className="mt-2">
+                  Your latest requests and their current status.
+                </CardDescription>
+              </div>
+
+              <LifeBuoy
+                aria-hidden="true"
+                className="size-5 text-muted-foreground"
+              />
+            </CardHeader>
+
+            <CardContent>
+              {supportRequests.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No support requests have been submitted.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {supportRequests.slice(0, 3).map((request) => (
+                    <div
+                      key={request.id}
+                      className="flex items-center justify-between gap-4 border-b border-border/70 pb-3 last:border-0 last:pb-0"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {request.subject}
+                        </p>
+
+                        <p className="mt-1 text-xs capitalize text-muted-foreground">
+                          {request.status.replaceAll("_", " ")}
+                        </p>
+                      </div>
+
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {formatDate(request.updated_at)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="mt-5 w-full"
+              >
+                <Link href={"/dashboard/support" as Route}>
+                  View support
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="ml-2 size-4"
+                  />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
     </div>
   );
 }
 
 type OverviewCardProps = {
   title: string;
-  value: string;
+  value: number;
   description: string;
   icon: typeof FolderKanban;
+  href: Route;
 };
 
 function OverviewCard({
@@ -376,29 +634,45 @@ function OverviewCard({
   value,
   description,
   icon: Icon,
+  href,
 }: OverviewCardProps) {
   return (
-    <Card className="border-border/70">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {title}
-        </CardTitle>
+    <Link href={href} className="block">
+      <Card className="group h-full border-border/70 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            {title}
+          </CardTitle>
 
-        <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
-      </CardHeader>
+          <Icon
+            aria-hidden="true"
+            className="size-4 text-muted-foreground transition-colors group-hover:text-foreground"
+          />
+        </CardHeader>
 
-      <CardContent>
-        <p className="text-3xl font-bold tracking-tight">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
+        <CardContent>
+          <p className="text-3xl font-bold tracking-tight">{value}</p>
+
+          <div className="mt-1 flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              {description}
+            </p>
+
+            <ArrowRight
+              aria-hidden="true"
+              className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
 function RecentProjectCard({ project }: { project: Project }) {
   const status = statusConfig[project.status] ?? statusConfig.planned;
   const StatusIcon = status.icon;
-  const progress = Math.min(Math.max(project.progress ?? 0, 0), 100);
+  const progress = normalizeProgress(project.progress);
 
   return (
     <Card className="flex h-full flex-col border-border/70">
@@ -417,7 +691,8 @@ function RecentProjectCard({ project }: { project: Project }) {
         </div>
 
         <CardDescription className="line-clamp-2 leading-relaxed">
-          {project.description || "No project description has been added."}
+          {project.description ||
+            "No project description has been added."}
         </CardDescription>
       </CardHeader>
 
@@ -475,11 +750,13 @@ function EmptyProjectsState() {
           />
         </div>
 
-        <h3 className="mt-5 font-semibold">No projects have been added</h3>
+        <h3 className="mt-5 font-semibold">
+          No projects have been added
+        </h3>
 
         <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-          Projects assigned to your account will appear here with their current
-          progress, status, and due dates.
+          Projects assigned to your account will appear here with their
+          current progress, status, and due dates.
         </p>
 
         <Button asChild className="mt-6">
@@ -518,11 +795,23 @@ function DashboardErrorState() {
   );
 }
 
+function normalizeProgress(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(Math.max(Math.round(value), 0), 100);
+}
+
 function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
+  const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+
+  const date = dateOnlyPattern.test(value)
+    ? new Date(`${value}T00:00:00`)
+    : new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Not scheduled";
+    return "Unknown";
   }
 
   return new Intl.DateTimeFormat("en-US", {
