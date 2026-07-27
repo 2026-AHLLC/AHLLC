@@ -52,6 +52,18 @@ function formatMultilineText(value: string) {
   return escapeHtml(value).replaceAll("\n", "<br />");
 }
 
+function formatStatus(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function formatPriority(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 export async function sendNewSupportRequestEmail({
   requestId,
   clientName,
@@ -82,8 +94,13 @@ export async function sendNewSupportRequestEmail({
             <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
               <tr>
                 <td align="center" style="padding:32px 16px;">
-                  <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
-                    style="max-width:640px;background:#ffffff;border:1px solid #e4e4e7;border-radius:14px;">
+                  <table
+                    width="100%"
+                    cellpadding="0"
+                    cellspacing="0"
+                    role="presentation"
+                    style="max-width:640px;background:#ffffff;border:1px solid #e4e4e7;border-radius:14px;"
+                  >
                     <tr>
                       <td style="padding:32px;">
                         <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#71717a;">
@@ -107,7 +124,9 @@ export async function sendNewSupportRequestEmail({
                         }
 
                         <p style="margin:0 0 8px;">
-                          <strong>Priority:</strong> ${escapeHtml(priority)}
+                          <strong>Priority:</strong> ${escapeHtml(
+                            formatPriority(priority),
+                          )}
                         </p>
 
                         <p style="margin:0 0 20px;">
@@ -140,7 +159,7 @@ export async function sendNewSupportRequestEmail({
         "",
         `Client: ${clientName}`,
         clientEmail ? `Email: ${clientEmail}` : "",
-        `Priority: ${priority}`,
+        `Priority: ${formatPriority(priority)}`,
         `Subject: ${subject}`,
         "",
         message,
@@ -174,6 +193,7 @@ export async function sendAdminReplyEmail({
 
   const resend = getResend();
   const requestUrl = `${siteUrl}/dashboard/support`;
+  const formattedStatus = formatStatus(status);
 
   const { data, error } = await resend.emails.send(
     {
@@ -187,8 +207,13 @@ export async function sendAdminReplyEmail({
             <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
               <tr>
                 <td align="center" style="padding:32px 16px;">
-                  <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
-                    style="max-width:640px;background:#ffffff;border:1px solid #e4e4e7;border-radius:14px;">
+                  <table
+                    width="100%"
+                    cellpadding="0"
+                    cellspacing="0"
+                    role="presentation"
+                    style="max-width:640px;background:#ffffff;border:1px solid #e4e4e7;border-radius:14px;"
+                  >
                     <tr>
                       <td style="padding:32px;">
                         <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#71717a;">
@@ -208,7 +233,7 @@ export async function sendAdminReplyEmail({
                         </p>
 
                         <p style="margin:0 0 20px;">
-                          <strong>Status:</strong> ${escapeHtml(status)}
+                          <strong>Status:</strong> ${escapeHtml(formattedStatus)}
                         </p>
 
                         <div style="padding:18px;background:#f4f4f5;border-radius:10px;line-height:1.6;">
@@ -242,7 +267,7 @@ export async function sendAdminReplyEmail({
         "Your AH LLC support request was updated.",
         "",
         `Subject: ${subject}`,
-        `Status: ${status}`,
+        `Status: ${formattedStatus}`,
         "",
         adminResponse,
         "",
