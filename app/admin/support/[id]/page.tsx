@@ -1,4 +1,5 @@
 import type { Metadata, Route } from "next";
+import { sendAdminReplyEmail } from "@/lib/email/support-notifications";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
@@ -55,6 +56,7 @@ type Profile = {
   full_name: string | null;
   company_name: string | null;
   phone: string | null;
+  email: string | null;
 };
 
 type Project = {
@@ -105,7 +107,36 @@ async function updateSupportRequest(formData: FormData) {
     redirect("/admin/support");
   }
 
-  const { error } = await supabase
+  const { data: existingRequest, error: existingRequestError } =
+    await supabase
+      .from("support_requests")
+      .select(
+        `
+          id,
+          client_id,
+          subject,
+          status,
+          priority,
+          admin_response
+        `,
+      )
+      .eq("id", id)
+      .maybeSingle();
+
+  if (existingRequestError || !existingRequest) {
+    console.error(
+      "Unable to load support request before update:",
+      existingRequestError,
+    );
+
+    redirect(
+      `/admin/support/${id}?error=${encodeURIComponent(
+        "The support request could not be loaded.",
+      )}` as Route,
+    );
+  }
+
+  const { error: updateError } = await supabase
     .from("support_requests")
     .update({
       status,
@@ -115,8 +146,8 @@ async function updateSupportRequest(formData: FormData) {
     })
     .eq("id", id);
 
-  if (error) {
-    console.error("Unable to update support request:", error);
+  if (updateError) {
+    console.error("Unable to update support request:", updateError);
 
     redirect(
       `/admin/support/${id}?error=${encodeURIComponent(
@@ -125,10 +156,66 @@ async function updateSupportRequest(formData: FormData) {
     );
   }
 
+  const responseChanged =
+    adminResponse.length > 0 &&
+    adminResponse !== (existingRequest.admin_response ?? "");
+
+  if (responseChanged) {
+    const { data: clientProfile, error: clientProfileError } =
+      await supabase
+        .from("profiles")
+        .select("id, full_name, company_name, email")
+        .eq("id", existingRequest.client_id)
+        .maybeSingle();
+
+    if (clientProfileError) {
+      console.error(
+        "Support request updated, but client profile lookup failed:",
+        clientProfileError,
+      );
+    }
+
+    const clientEmail = clientProfile?.email?.trim() ?? "";
+
+    const clientName =
+      clientProfile?.company_name?.trim() ||
+      clientProfile?.full_name?.trim() ||
+      "AH LLC Client";
+
+    if (clientEmail) {
+      try {
+        await sendAdminReplyEmail({
+          requestId: id,
+          clientName,
+          clientEmail,
+          subject: existingRequest.subject,
+          adminResponse,
+          status,
+        });
+      } catch (emailError) {
+        console.error(
+          "Support response saved, but client notification failed:",
+          emailError instanceof Error
+            ? {
+                name: emailError.name,
+                message: emailError.message,
+                stack: emailError.stack,
+              }
+            : emailError,
+        );
+      }
+    } else {
+      console.error(
+        "Support response saved, but the client profile has no email address.",
+      );
+    }
+  }
+
+  revalidatePath("/admin");
   revalidatePath("/admin/support");
   revalidatePath(`/admin/support/${id}`);
-  revalidatePath("/dashboard/support");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/support");
 
   redirect(`/admin/support/${id}?saved=1` as Route);
 }
@@ -174,7 +261,7 @@ export default async function ManageSupportRequestPage({
   const [profileResult, projectResult] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, company_name, phone")
+      .select("id, full_name, company_name, phone, email")
       .eq("id", request.client_id)
       .maybeSingle(),
 
