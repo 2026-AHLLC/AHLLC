@@ -1,258 +1,183 @@
+// app/actions/auth.ts
+
 "use server";
 
 import type { Route } from "next";
-import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 
-export type AuthActionState = {
-  success: boolean;
-  message: string;
-};
+type AuthState = {
+  error?: string;
+} | null;
 
-const DEFAULT_LOGIN_REDIRECT: Route = "/dashboard";
-const MINIMUM_PASSWORD_LENGTH = 8;
-
-function getFormValue(formData: FormData, key: string): string {
+function getString(
+  formData: FormData,
+  key: string,
+) {
   const value = formData.get(key);
 
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === "string"
+    ? value.trim()
+    : "";
 }
 
-function getSafeRedirectPath(
+function isValidRedirect(
   value: string,
-  fallback: Route = DEFAULT_LOGIN_REDIRECT,
-): Route {
-  if (!value.startsWith("/") || value.startsWith("//")) {
-    return fallback;
-  }
-
-  return value as Route;
+) {
+  return (
+    value.startsWith("/") &&
+    !value.startsWith("//")
+  );
 }
 
-/**
- * Signs an existing user in with an email address and password.
- */
+
 export async function login(
-  _previousState: AuthActionState,
+  _state: AuthState,
   formData: FormData,
-): Promise<AuthActionState> {
-  const email = getFormValue(formData, "email").toLowerCase();
-  const password = getFormValue(formData, "password");
-  const requestedRedirect = getFormValue(formData, "redirectTo");
-  const redirectTo = getSafeRedirectPath(requestedRedirect);
+) {
+  const supabase = await createClient();
+
+  const email = getString(
+    formData,
+    "email",
+  );
+
+  const password = getString(
+    formData,
+    "password",
+  );
+
+  const redirectTo =
+    getString(
+      formData,
+      "redirectTo",
+    ) || "/dashboard";
+
 
   if (!email || !password) {
     return {
-      success: false,
-      message: "Enter your email address and password.",
+      error:
+        "Email and password are required.",
     };
   }
 
-  try {
-    const supabase = await createClient();
 
-    const { error } = await supabase.auth.signInWithPassword({
+  const {
+    error: loginError,
+  } =
+    await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) {
-      console.error("Supabase login error:", error.message);
 
-      return {
-        success: false,
-        message:
-          error.message === "Invalid login credentials"
-            ? "The email address or password is incorrect."
-            : "We could not sign you in. Please try again.",
-      };
-    }
-  } catch (error) {
-    console.error("Login action error:", error);
+  if (loginError) {
+    console.error(
+      "Login failed:",
+      loginError,
+    );
 
     return {
-      success: false,
-      message:
-        "We could not connect to the authentication service. Please try again.",
+      error:
+        "Invalid email or password.",
     };
   }
 
-  revalidatePath("/", "layout");
-  redirect(redirectTo);
+
+  const {
+    data: {
+      user,
+    },
+  } =
+    await supabase.auth.getUser();
+
+
+  if (!user) {
+    return {
+      error:
+        "Unable to load user account.",
+    };
+  }
+
+
+  const {
+    data: profile,
+    error: profileError,
+  } =
+    await supabase
+      .from("profiles")
+      .select(
+        `
+        role,
+        is_active
+        `,
+      )
+      .eq(
+        "id",
+        user.id,
+      )
+      .maybeSingle();
+
+
+  if (profileError) {
+    console.error(
+      "Profile lookup failed:",
+      profileError,
+    );
+
+    await supabase.auth.signOut();
+
+    return {
+      error:
+        "Unable to load account profile.",
+    };
+  }
+
+
+  if (
+    profile?.is_active === false
+  ) {
+    await supabase.auth.signOut();
+
+    redirect(
+      "/login?disabled=1" as Route,
+    );
+  }
+
+
+  if (
+    profile?.role === "admin"
+  ) {
+    redirect(
+      "/admin" as Route,
+    );
+  }
+
+
+  if (
+    isValidRedirect(
+      redirectTo,
+    )
+  ) {
+    redirect(
+      redirectTo as Route,
+    );
+  }
+
+
+  redirect(
+    "/dashboard" as Route,
+  );
 }
 
-/**
- * Signs the current user out and returns them to the login page.
- */
-export async function logout(): Promise<never> {
-  try {
-    const supabase = await createClient();
 
-    const { error } = await supabase.auth.signOut();
+export async function logout() {
+  const supabase = await createClient();
 
-    if (error) {
-      console.error("Supabase logout error:", error.message);
-    }
-  } catch (error) {
-    console.error("Logout action error:", error);
-  }
+  await supabase.auth.signOut();
 
-  revalidatePath("/", "layout");
-  redirect("/login");
-}
-
-/**
- * Sends a password-recovery email.
- */
-export async function requestPasswordReset(
-  _previousState: AuthActionState,
-  formData: FormData,
-): Promise<AuthActionState> {
-  const email = getFormValue(formData, "email").toLowerCase();
-
-  if (!email) {
-    return {
-      success: false,
-      message: "Enter the email address associated with your account.",
-    };
-  }
-
-  try {
-    const requestHeaders = await headers();
-
-    const origin =
-      requestHeaders.get("origin") ??
-      requestHeaders.get("x-forwarded-host") ??
-      requestHeaders.get("host");
-
-    let siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
-
-    if (!siteUrl && origin) {
-      const protocol =
-        requestHeaders.get("x-forwarded-proto") ??
-        (origin.includes("localhost") ? "http" : "https");
-
-      siteUrl = origin.startsWith("http")
-        ? origin.replace(/\/$/, "")
-        : `${protocol}://${origin}`.replace(/\/$/, "");
-    }
-
-    siteUrl ??= "http://localhost:3000";
-
-    const supabase = await createClient();
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
-    });
-
-    if (error) {
-      console.error("Supabase password-reset error:", error.message);
-
-      return {
-        success: false,
-        message:
-          "We could not send the password reset email. Please try again.",
-      };
-    }
-
-    return {
-      success: true,
-      message:
-        "If an account exists for that email address, a password reset link has been sent.",
-    };
-  } catch (error) {
-    console.error("Password-reset action error:", error);
-
-    return {
-      success: false,
-      message:
-        "We could not send the password reset email. Please try again.",
-    };
-  }
-}
-
-/**
- * Updates the password for a user with an active recovery session.
- */
-export async function updatePassword(
-  _previousState: AuthActionState,
-  formData: FormData,
-): Promise<AuthActionState> {
-  const password = getFormValue(formData, "password");
-  const confirmPassword = getFormValue(formData, "confirmPassword");
-
-  if (password.length < MINIMUM_PASSWORD_LENGTH) {
-    return {
-      success: false,
-      message: `Your password must contain at least ${MINIMUM_PASSWORD_LENGTH} characters.`,
-    };
-  }
-
-  if (password !== confirmPassword) {
-    return {
-      success: false,
-      message: "The passwords do not match.",
-    };
-  }
-
-  try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return {
-        success: false,
-        message:
-          "Your password reset session is invalid or has expired. Request a new reset link.",
-      };
-    }
-
-    const { error: updateError } = await supabase.auth.updateUser({
-      password,
-    });
-
-    if (updateError) {
-      console.error(
-        "Supabase password-update error:",
-        updateError.message,
-      );
-
-      return {
-        success: false,
-        message:
-          "We could not update your password. Please request a new reset link and try again.",
-      };
-    }
-
-    const { error: signOutError } = await supabase.auth.signOut();
-
-    if (signOutError) {
-      console.error(
-        "Supabase recovery-session sign-out error:",
-        signOutError.message,
-      );
-    }
-  } catch (error) {
-    console.error("Password-update action error:", error);
-
-    return {
-      success: false,
-      message:
-        "We could not update your password. Please request a new reset link and try again.",
-    };
-  }
-
-  revalidatePath("/", "layout");
-
-  return {
-    success: true,
-    message: "Your password has been updated successfully.",
-  };
+  redirect(
+    "/login" as Route,
+  );
 }
