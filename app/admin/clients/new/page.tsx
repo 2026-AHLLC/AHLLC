@@ -1,7 +1,10 @@
+// app/admin/clients/new/page.tsx
+
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, UserPlus } from "lucide-react";
+import { Resend } from "resend";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,11 +14,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import { sendClientOnboardingEmail } from "@/lib/email/client-onboarding";
 import { createClient } from "@/lib/supabase/server";
+import { sendClientOnboardingEmail } from "@/lib/email/client-onboarding";
 
 export const metadata: Metadata = {
   title: "Create Client | AH LLC Admin",
@@ -25,46 +29,71 @@ export const metadata: Metadata = {
   },
 };
 
-async function createClientAccount(formData: FormData) {
+
+async function createClientAccount(
+  formData: FormData,
+) {
   "use server";
+
 
   const supabase = await createClient();
 
+
   const {
-    data: { user: adminUser },
-    error: authError,
+    data: {
+      user: adminUser,
+    },
   } = await supabase.auth.getUser();
 
-  if (authError || !adminUser) {
-    redirect("/login?redirectTo=/admin/clients/new");
+
+  if (!adminUser) {
+    redirect("/login");
   }
 
-  const fullName = getString(formData, "full_name");
-  const companyName = getString(formData, "company_name");
-  const email = getString(formData, "email");
-  const password = getString(formData, "password");
 
-  if (!fullName || !email || !password) {
+  const fullName =
+    getString(formData, "full_name");
+
+  const companyName =
+    getString(formData, "company_name");
+
+  const email =
+    getString(formData, "email");
+
+  const password =
+    getString(formData, "password");
+
+
+  if (
+    !fullName ||
+    !email ||
+    !password
+  ) {
     redirect(
       "/admin/clients/new?error=Missing required fields" as Route,
     );
   }
 
-  const { data: existingProfile } = await supabase
+
+  const {
+    data: existingClient,
+  } = await supabase
     .from("profiles")
     .select("id")
     .eq("email", email)
     .maybeSingle();
 
-  if (existingProfile) {
+
+  if (existingClient) {
     redirect(
       "/admin/clients/new?error=Client already exists" as Route,
     );
   }
 
+
   const {
     data: createdUser,
-    error: createUserError,
+    error: userError,
   } =
     await supabase.auth.admin.createUser({
       email,
@@ -75,38 +104,41 @@ async function createClientAccount(formData: FormData) {
       },
     });
 
-  if (createUserError || !createdUser.user) {
-    console.error(
-      "Unable to create client auth user:",
-      createUserError,
-    );
 
+  if (
+    userError ||
+    !createdUser.user
+  ) {
     redirect(
       `/admin/clients/new?error=${encodeURIComponent(
-        createUserError?.message ||
+        userError?.message ||
           "Unable to create account",
       )}` as Route,
     );
   }
 
-  const clientId = createdUser.user.id;
 
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .insert({
-      id: clientId,
-      full_name: fullName,
-      company_name: companyName || null,
-      email,
-      role: "client",
-    });
+  const clientId =
+    createdUser.user.id;
+
+
+  const {
+    error: profileError,
+  } =
+    await supabase
+      .from("profiles")
+      .insert({
+        id: clientId,
+        full_name: fullName,
+        company_name:
+          companyName || null,
+        email,
+        role: "client",
+        is_active: true,
+      });
+
 
   if (profileError) {
-    console.error(
-      "Unable to create client profile:",
-      profileError,
-    );
-
     redirect(
       `/admin/clients/new?error=${encodeURIComponent(
         profileError.message,
@@ -114,21 +146,79 @@ async function createClientAccount(formData: FormData) {
     );
   }
 
+
+  /*
+    Add client to Resend Audience
+  */
+
   try {
-    await sendClientOnboardingEmail({
-      clientName: companyName || fullName,
-      clientEmail: email,
-      temporaryPassword: password,
-    });
-  } catch (emailError) {
+    const resend =
+      new Resend(
+        process.env.RESEND_API_KEY,
+      );
+
+
+    const audienceId =
+      process.env.RESEND_AUDIENCE_ID;
+
+
+    if (
+      audienceId
+    ) {
+      await resend.contacts.create({
+        audienceId,
+        email,
+        firstName:
+          fullName.split(" ")[0],
+        unsubscribed: false,
+      });
+    }
+
+  } catch (error) {
+
     console.error(
-      "Client created but onboarding email failed:",
-      emailError,
+      "Resend contact creation failed:",
+      error,
     );
+
   }
 
-  redirect("/admin/clients?created=1");
+
+
+  /*
+    Send onboarding email
+  */
+
+  try {
+
+    await sendClientOnboardingEmail({
+      clientName:
+        companyName ||
+        fullName,
+      clientEmail:
+        email,
+      temporaryPassword:
+        password,
+    });
+
+
+  } catch(error){
+
+    console.error(
+      "Welcome email failed:",
+      error,
+    );
+
+  }
+
+
+
+  redirect(
+    "/admin/clients?created=1",
+  );
 }
+
+
 
 export default async function NewClientPage({
   searchParams,
@@ -137,112 +227,177 @@ export default async function NewClientPage({
     error?: string;
   }>;
 }) {
-  const params = await searchParams;
+
+  const params =
+    await searchParams;
+
 
   return (
-    <div className="space-y-8">
-      <div>
-        <Button asChild variant="ghost">
-          <Link href="/admin/clients">
-            <ArrowLeft className="mr-2 size-4" />
-            Back to clients
-          </Link>
-        </Button>
-      </div>
 
-      <Card className="max-w-2xl border-border/70">
+    <div className="space-y-8">
+
+
+      <Button
+        asChild
+        variant="ghost"
+      >
+
+        <Link href="/admin/clients">
+
+          <ArrowLeft className="mr-2 size-4"/>
+
+          Back to clients
+
+        </Link>
+
+      </Button>
+
+
+
+      <Card className="max-w-2xl">
+
+
         <CardHeader>
-          <div className="mb-3 flex size-12 items-center justify-center rounded-xl border border-primary/20 bg-primary/5">
-            <UserPlus className="size-6 text-primary" />
+
+          <div className="flex size-12 items-center justify-center rounded-xl border">
+
+            <UserPlus className="size-6"/>
+
           </div>
 
-          <CardTitle>Create Client Account</CardTitle>
+
+          <CardTitle>
+            Create Client Account
+          </CardTitle>
+
 
           <CardDescription>
-            Create a secure AH LLC client portal account and send a
-            welcome email automatically.
+            Create a portal account,
+            add the client to your email
+            audience, and send onboarding.
           </CardDescription>
+
+
         </CardHeader>
 
+
+
         <CardContent>
+
+
           {params.error ? (
-            <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+
+            <div className="mb-5 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm">
+
               {params.error}
+
             </div>
+
           ) : null}
 
-          <form action={createClientAccount} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="full_name">
-                Full name
+
+
+          <form
+            action={createClientAccount}
+            className="space-y-5"
+          >
+
+
+            <div>
+              <Label>
+                Full Name
               </Label>
 
               <Input
-                id="full_name"
                 name="full_name"
-                placeholder="John Smith"
                 required
               />
+
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="company_name">
-                Company name
+
+
+            <div>
+              <Label>
+                Company
               </Label>
 
               <Input
-                id="company_name"
                 name="company_name"
-                placeholder="Example Company LLC"
               />
+
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">
-                Email address
+
+
+            <div>
+              <Label>
+                Email
               </Label>
 
               <Input
-                id="email"
                 name="email"
                 type="email"
-                placeholder="client@example.com"
                 required
               />
+
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">
-                Temporary password
+
+
+            <div>
+              <Label>
+                Temporary Password
               </Label>
 
               <Input
-                id="password"
                 name="password"
-                type="text"
-                placeholder="Generate secure password"
                 required
               />
+
             </div>
 
-            <Button type="submit" className="w-full">
-              <UserPlus className="mr-2 size-4" />
-              Create Client Account
+
+
+            <Button
+              className="w-full"
+              type="submit"
+            >
+
+              <UserPlus className="mr-2 size-4"/>
+
+              Create Client
+
             </Button>
+
+
           </form>
+
+
         </CardContent>
+
+
       </Card>
+
+
     </div>
+
   );
 }
+
+
 
 function getString(
   formData: FormData,
   key: string,
 ) {
-  const value = formData.get(key);
+
+  const value =
+    formData.get(key);
+
 
   return typeof value === "string"
     ? value.trim()
     : "";
+
 }
