@@ -28,7 +28,9 @@ export function LoginForm({
     setError(null);
     setPending(true);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(
+      event.currentTarget,
+    );
 
     formData.set(
       "redirectTo",
@@ -36,7 +38,10 @@ export function LoginForm({
     );
 
     try {
-      const result = await login(formData);
+      const result = await login(
+        null,
+        formData,
+      );
 
       if (result?.error) {
         setError(result.error);
@@ -60,7 +65,6 @@ export function LoginForm({
       onSubmit={handleSubmit}
       className="space-y-5"
     >
-
       {error ? (
         <div
           role="alert"
@@ -69,7 +73,6 @@ export function LoginForm({
           {error}
         </div>
       ) : null}
-
 
       <div className="space-y-2">
         <Label htmlFor="email">
@@ -86,7 +89,6 @@ export function LoginForm({
         />
       </div>
 
-
       <div className="space-y-2">
         <Label htmlFor="password">
           Password
@@ -101,7 +103,6 @@ export function LoginForm({
           required
         />
       </div>
-
 
       <Button
         type="submit"
@@ -126,7 +127,6 @@ export function LoginForm({
           </>
         )}
       </Button>
-
     </form>
   );
 }
