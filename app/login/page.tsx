@@ -1,99 +1,164 @@
 import type { Metadata, Route } from "next";
 import Link from "next/link";
+import { AlertCircle, LockKeyhole } from "lucide-react";
+
+import { LoginForm } from "@/components/auth/login-form";
 
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { LoginForm } from "@/components/auth/login-form";
 
 export const metadata: Metadata = {
-  title: "Client Login | AH LLC",
+  title: "Login | AH LLC Client Portal",
   description:
-    "Sign in to the secure AH LLC client portal to access projects, documents, consultations, and support.",
+    "Secure login for AH LLC clients and administrators.",
   robots: {
     index: false,
     follow: false,
   },
 };
 
-export default function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<{
+    disabled?: string;
+    error?: string;
+    redirectTo?: string;
+    message?: string;
+  }>;
+};
+
+export default async function LoginPage({
+  searchParams,
+}: LoginPageProps) {
+  const params = await searchParams;
+
+  const redirectTo =
+    params.redirectTo || "/dashboard";
+
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-16">
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.12),transparent_45%)]"
-      />
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
 
-      <div
-        aria-hidden="true"
-        className="absolute left-1/2 top-0 h-px w-full max-w-5xl -translate-x-1/2 bg-gradient-to-r from-transparent via-primary/40 to-transparent"
-      />
+      <Card className="w-full max-w-md border-border/70 shadow-lg">
 
-      <div
-        aria-hidden="true"
-        className="absolute bottom-0 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-primary/5 blur-3xl"
-      />
+        <CardHeader className="space-y-4 text-center">
 
-      <Card className="relative z-10 w-full max-w-md border-border/60 bg-card/95 shadow-2xl backdrop-blur">
-        <CardHeader className="space-y-5 text-center">
-          <Link
-            href={"/" as Route}
-            className="mx-auto inline-flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            aria-label="Return to the AH LLC homepage"
-          >
-            <div className="flex size-11 items-center justify-center rounded-xl bg-foreground text-background shadow-sm">
-              <span className="text-sm font-bold tracking-tight">AH</span>
-            </div>
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/5">
+            <LockKeyhole
+              aria-hidden="true"
+              className="size-7 text-primary"
+            />
+          </div>
 
-            <div className="text-left">
-              <span className="block text-xl font-bold leading-none tracking-tight">
-                AH LLC
-              </span>
 
-              <span className="mt-1 block text-xs text-muted-foreground">
-                Client Portal
-              </span>
-            </div>
-          </Link>
-
-          <div className="space-y-2">
-            <CardTitle className="text-2xl tracking-tight sm:text-3xl">
-              Welcome back
+          <div>
+            <CardTitle className="text-2xl">
+              AH LLC Portal
             </CardTitle>
 
-            <CardDescription className="text-sm leading-relaxed sm:text-base">
-              Sign in to access your projects, documents, consultations, and
-              support.
+            <CardDescription className="mt-2">
+              Sign in to access your projects,
+              documents, and support.
             </CardDescription>
           </div>
+
         </CardHeader>
 
-        <CardContent>
-          <LoginForm />
+
+        <CardContent className="space-y-5">
+
+          {params.disabled === "1" ? (
+            <div
+              role="alert"
+              className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+            >
+              <AlertCircle
+                aria-hidden="true"
+                className="size-5 shrink-0"
+              />
+
+              <div>
+                <p className="font-semibold">
+                  Account access disabled
+                </p>
+
+                <p className="mt-1">
+                  Your portal access has been temporarily
+                  suspended. Please contact AH LLC for
+                  assistance.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+
+          {params.error === "profile" ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200"
+            >
+              Your account profile could not be loaded.
+              Please contact AH LLC support.
+            </div>
+          ) : null}
+
+
+          {params.error &&
+          params.error !== "profile" &&
+          params.disabled !== "1" ? (
+            <div
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+            >
+              Unable to sign in. Please check your
+              credentials and try again.
+            </div>
+          ) : null}
+
+
+          {params.message ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300">
+              {params.message}
+            </div>
+          ) : null}
+
+
+          <LoginForm
+            redirectTo={redirectTo as Route}
+          />
+
+
+          <div className="space-y-3 text-center text-sm">
+
+            <Link
+              href="/forgot-password"
+              className="text-primary hover:underline"
+            >
+              Forgot your password?
+            </Link>
+
+
+            <p className="text-muted-foreground">
+              Need help accessing your account?
+            </p>
+
+
+            <Link
+              href="/contact"
+              className="text-primary hover:underline"
+            >
+              Contact AH LLC Support
+            </Link>
+
+          </div>
+
         </CardContent>
 
-        <CardFooter className="flex flex-col gap-4 border-t border-border/60 pt-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            Need access to the client portal?{" "}
-            <Link
-              href={"/contact" as Route}
-              className="font-medium text-foreground underline-offset-4 transition hover:text-primary hover:underline"
-            >
-              Contact AH LLC
-            </Link>
-          </p>
-
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            This portal is restricted to authorized AH LLC clients and
-            administrators.
-          </p>
-        </CardFooter>
       </Card>
+
     </main>
   );
 }
