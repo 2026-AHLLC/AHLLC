@@ -25,7 +25,7 @@ const CALENDAR_URL = "https://cal.com/john-egan-2025/30min";
 const plans = [
   {
     name: "Starter",
-    price: "$999",
+    price: "$199 / month",
     description:
       "For small businesses ready to improve their online presence.",
     features: [
@@ -41,7 +41,7 @@ const plans = [
   },
   {
     name: "Growth",
-    price: "$1,999",
+    price: "$299 / month",
     description:
       "For businesses that need a complete growth system.",
     features: [
@@ -58,7 +58,7 @@ const plans = [
   },
   {
     name: "Scale",
-    price: "$3,999",
+    price: "$499 / month",
     description:
       "For businesses requiring custom automation and software.",
     features: [
