@@ -105,12 +105,7 @@ export default function JohnnysStudioPortfolioPage() {
                   </Link>
                 </Button>
 
-                <Button size="lg" variant="outline" asChild>
-                  <a href="https://johnnys.studio" target="_blank" rel="noreferrer">
-                    Visit Website
-                    <Globe2 className="ml-2 h-5 w-5" />
-                  </a>
-                </Button>
+               
               </div>
 
               <div className="mt-10 grid max-w-2xl grid-cols-2 gap-4 sm:grid-cols-4">
