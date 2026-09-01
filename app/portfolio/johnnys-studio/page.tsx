@@ -123,30 +123,7 @@ export default function JohnnysStudioPortfolioPage() {
               </div>
             </div>
 
-            <Card variant="glass" className="relative overflow-hidden rounded-[2rem] p-3">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-transparent to-violet-500/20" />
-              <div className="relative overflow-hidden rounded-[1.5rem] border border-white/10 bg-zinc-950">
-                <Image
-                  src="/portfolio/project-01.webp"
-                  alt="Johnny's Studio website project"
-                  width={1200}
-                  height={900}
-                  priority
-                  className="h-auto w-full object-cover"
-                />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/60 to-transparent p-6 pt-20">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-zinc-950">
-                      <Play className="ml-0.5 h-5 w-5 fill-current" />
-                    </span>
-                    <div>
-                      <p className="font-semibold text-white">Creative work that converts</p>
-                      <p className="text-sm text-zinc-300">Brand, website, content, and marketing</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
+          
           </div>
         </Section>
 
